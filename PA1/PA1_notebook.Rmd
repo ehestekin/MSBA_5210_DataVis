@@ -9,6 +9,7 @@ output: html_notebook
 # Purpose: Analyze orange juice purchases
 # Date: 1/9/20
 # Author: Eric Hestekin
+# Repo:  https://github.com/ehestekin/MSBA_5210_DataVis
 ```
 
 ``` {r echo = FALSE}
@@ -18,6 +19,7 @@ rm(list = ls(all = TRUE))
 # Clear environmet of packages
 if(is.null(sessionInfo()$otherPkgs) == FALSE)lapply(paste("package:", names(sessionInfo()$otherPkgs), sep=""), detach, character.only = TRUE, unload = TRUE)
 
+
 ```
 
 ``` {r setup, include = FALSE, warning = FALSE}
@@ -26,3 +28,23 @@ library(tidyverse)
 
 ```
 
+``` {r}
+# Load Data
+oj_data <- read.csv("OJ_Data.csv")
+
+# View first few rows of data
+head(oj_data, 3)
+
+
+```
+
+Are the distributions symmetric or skewed?
+==========================================
+
+``` {r} 
+
+summary(oj_data)
+
+```
+
++ The distrobutions of price are very symmetric

@@ -1761,8 +1761,57 @@ summary {
 <!-- rnb-text-end -->
 <!-- rnb-text-begin -->
 <!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuIyBMb2FkIERhdGFcbm9qX2RhdGEgPC0gcmVhZC5jc3YoXCJPSl9EYXRhLmNzdlwiKVxuXG4jIFZpZXcgZmlyc3QgZmV3IHJvd3Mgb2YgZGF0YVxuaGVhZChval9kYXRhLCAzKVxuXG5cbmBgYCJ9 -->
+<pre class="r"><code># Load Data
+oj_data &lt;- read.csv(&quot;OJ_Data.csv&quot;)
 
-<div id="rmd-source-code">LS0tDQp0aXRsZTogIlBBMSBPSjogTWludXRlIE1haWQgdnMgQ2l0cnVzIEhpbGwgUHVyY2hhc2VzIg0KZGF0ZTogICIxLzkvMjAiDQpvdXRwdXQ6IGh0bWxfbm90ZWJvb2sNCi0tLQ0KDQpgYGAge3IgZWNobyA9IEZBTFNFfQ0KIyBDb3Vyc2U6IDUyMTAgQ29tbXVuaWNhdGluZyBEYXRhDQojIFB1cnBvc2U6IEFuYWx5emUgb3JhbmdlIGp1aWNlIHB1cmNoYXNlcw0KIyBEYXRlOiAxLzkvMjANCiMgQXV0aG9yOiBFcmljIEhlc3Rla2luDQpgYGANCg0KYGBgIHtyIGVjaG8gPSBGQUxTRX0NCiMgQ2xlYXIgZW52aXJvbm1lbnQgb2YgdmFyaWFibGVzIGFuZCBmdW5jdGlvbnMNCnJtKGxpc3QgPSBscyhhbGwgPSBUUlVFKSkgDQoNCiMgQ2xlYXIgZW52aXJvbm1ldCBvZiBwYWNrYWdlcw0KaWYoaXMubnVsbChzZXNzaW9uSW5mbygpJG90aGVyUGtncykgPT0gRkFMU0UpbGFwcGx5KHBhc3RlKCJwYWNrYWdlOiIsIG5hbWVzKHNlc3Npb25JbmZvKCkkb3RoZXJQa2dzKSwgc2VwPSIiKSwgZGV0YWNoLCBjaGFyYWN0ZXIub25seSA9IFRSVUUsIHVubG9hZCA9IFRSVUUpDQoNCmBgYA0KDQpgYGAge3Igc2V0dXAsIGluY2x1ZGUgPSBGQUxTRSwgd2FybmluZyA9IEZBTFNFfQ0KIyBMb2FkIExpYnJhcnkNCmxpYnJhcnkodGlkeXZlcnNlKQ0KDQpgYGANCg0K</div>
+# View first few rows of data
+head(oj_data, 3)
+</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+<div id="are-the-distributions-symmetric-or-skewed" class="section level1">
+<h1>Are the distributions symmetric or skewed?</h1>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuc3VtbWFyeShval9kYXRhKVxuXG5gYGAifQ== -->
+<pre class="r"><code>summary(oj_data)
+</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-output-begin eyJkYXRhIjoiICAgICAgIElkICAgICAgICAgUHVyY2hhc2UgICAgUHJpY2VDSCAgICAgICAgIFByaWNlTU0gICAgIFxuIE1pbi4gICA6ICAgMS4wICAgQ0g6NjUzICAgTWluLiAgIDoxLjY5MCAgIE1pbi4gICA6MS42OTAgIFxuIDFzdCBRdS46IDI2OC4yICAgTU06NDE3ICAgMXN0IFF1LjoxLjc5MCAgIDFzdCBRdS46MS45OTAgIFxuIE1lZGlhbiA6IDUzNS41ICAgICAgICAgICAgTWVkaWFuIDoxLjg2MCAgIE1lZGlhbiA6Mi4wOTAgIFxuIE1lYW4gICA6IDUzNS41ICAgICAgICAgICAgTWVhbiAgIDoxLjg2NyAgIE1lYW4gICA6Mi4wODUgIFxuIDNyZCBRdS46IDgwMi44ICAgICAgICAgICAgM3JkIFF1LjoxLjk5MCAgIDNyZCBRdS46Mi4xODAgIFxuIE1heC4gICA6MTA3MC4wICAgICAgICAgICAgTWF4LiAgIDoyLjA5MCAgIE1heC4gICA6Mi4yOTAgIFxuICAgICBEaXNjQ0ggICAgICAgICAgICBEaXNjTU0gICAgICAgICBTcGVjaWFsQ0ggICAgIFxuIE1pbi4gICA6MC4wMDAwMCAgIE1pbi4gICA6MC4wMDAwICAgTWluLiAgIDowLjAwMDAgIFxuIDFzdCBRdS46MC4wMDAwMCAgIDFzdCBRdS46MC4wMDAwICAgMXN0IFF1LjowLjAwMDAgIFxuIE1lZGlhbiA6MC4wMDAwMCAgIE1lZGlhbiA6MC4wMDAwICAgTWVkaWFuIDowLjAwMDAgIFxuIE1lYW4gICA6MC4wNTE4NiAgIE1lYW4gICA6MC4xMjM0ICAgTWVhbiAgIDowLjE0NzcgIFxuIDNyZCBRdS46MC4wMDAwMCAgIDNyZCBRdS46MC4yMzAwICAgM3JkIFF1LjowLjAwMDAgIFxuIE1heC4gICA6MC41MDAwMCAgIE1heC4gICA6MC44MDAwICAgTWF4LiAgIDoxLjAwMDAgIFxuICAgU3BlY2lhbE1NICAgICAgICAgIFNUT1JFICAgICAgXG4gTWluLiAgIDowLjAwMDAgICBNaW4uICAgOjAuMDAwICBcbiAxc3QgUXUuOjAuMDAwMCAgIDFzdCBRdS46MC4wMDAgIFxuIE1lZGlhbiA6MC4wMDAwICAgTWVkaWFuIDoyLjAwMCAgXG4gTWVhbiAgIDowLjE2MTcgICBNZWFuICAgOjEuNjMxICBcbiAzcmQgUXUuOjAuMDAwMCAgIDNyZCBRdS46My4wMDAgIFxuIE1heC4gICA6MS4wMDAwICAgTWF4LiAgIDo0LjAwMCAgXG4ifQ== -->
+<pre><code>       Id         Purchase    PriceCH         PriceMM     
+ Min.   :   1.0   CH:653   Min.   :1.690   Min.   :1.690  
+ 1st Qu.: 268.2   MM:417   1st Qu.:1.790   1st Qu.:1.990  
+ Median : 535.5            Median :1.860   Median :2.090  
+ Mean   : 535.5            Mean   :1.867   Mean   :2.085  
+ 3rd Qu.: 802.8            3rd Qu.:1.990   3rd Qu.:2.180  
+ Max.   :1070.0            Max.   :2.090   Max.   :2.290  
+     DiscCH            DiscMM         SpecialCH     
+ Min.   :0.00000   Min.   :0.0000   Min.   :0.0000  
+ 1st Qu.:0.00000   1st Qu.:0.0000   1st Qu.:0.0000  
+ Median :0.00000   Median :0.0000   Median :0.0000  
+ Mean   :0.05186   Mean   :0.1234   Mean   :0.1477  
+ 3rd Qu.:0.00000   3rd Qu.:0.2300   3rd Qu.:0.0000  
+ Max.   :0.50000   Max.   :0.8000   Max.   :1.0000  
+   SpecialMM          STORE      
+ Min.   :0.0000   Min.   :0.000  
+ 1st Qu.:0.0000   1st Qu.:0.000  
+ Median :0.0000   Median :2.000  
+ Mean   :0.1617   Mean   :1.631  
+ 3rd Qu.:0.0000   3rd Qu.:3.000  
+ Max.   :1.0000   Max.   :4.000  </code></pre>
+<!-- rnb-output-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+<ul>
+<li>The distrobutions of price are very symmetric</li>
+</ul>
+<!-- rnb-text-end -->
+</div>
+
+<div id="rmd-source-code">LS0tDQp0aXRsZTogIlBBMSBPSjogTWludXRlIE1haWQgdnMgQ2l0cnVzIEhpbGwgUHVyY2hhc2VzIg0KZGF0ZTogICIxLzkvMjAiDQpvdXRwdXQ6IGh0bWxfbm90ZWJvb2sNCi0tLQ0KDQpgYGAge3IgZWNobyA9IEZBTFNFfQ0KIyBDb3Vyc2U6IDUyMTAgQ29tbXVuaWNhdGluZyBEYXRhDQojIFB1cnBvc2U6IEFuYWx5emUgb3JhbmdlIGp1aWNlIHB1cmNoYXNlcw0KIyBEYXRlOiAxLzkvMjANCiMgQXV0aG9yOiBFcmljIEhlc3Rla2luDQojIFJlcG86ICBodHRwczovL2dpdGh1Yi5jb20vZWhlc3Rla2luL01TQkFfNTIxMF9EYXRhVmlzDQpgYGANCg0KYGBgIHtyIGVjaG8gPSBGQUxTRX0NCiMgQ2xlYXIgZW52aXJvbm1lbnQgb2YgdmFyaWFibGVzIGFuZCBmdW5jdGlvbnMNCnJtKGxpc3QgPSBscyhhbGwgPSBUUlVFKSkgDQoNCiMgQ2xlYXIgZW52aXJvbm1ldCBvZiBwYWNrYWdlcw0KaWYoaXMubnVsbChzZXNzaW9uSW5mbygpJG90aGVyUGtncykgPT0gRkFMU0UpbGFwcGx5KHBhc3RlKCJwYWNrYWdlOiIsIG5hbWVzKHNlc3Npb25JbmZvKCkkb3RoZXJQa2dzKSwgc2VwPSIiKSwgZGV0YWNoLCBjaGFyYWN0ZXIub25seSA9IFRSVUUsIHVubG9hZCA9IFRSVUUpDQoNCg0KYGBgDQoNCmBgYCB7ciBzZXR1cCwgaW5jbHVkZSA9IEZBTFNFLCB3YXJuaW5nID0gRkFMU0V9DQojIExvYWQgTGlicmFyeQ0KbGlicmFyeSh0aWR5dmVyc2UpDQoNCmBgYA0KDQpgYGAge3J9DQojIExvYWQgRGF0YQ0Kb2pfZGF0YSA8LSByZWFkLmNzdigiT0pfRGF0YS5jc3YiKQ0KDQojIFZpZXcgZmlyc3QgZmV3IHJvd3Mgb2YgZGF0YQ0KaGVhZChval9kYXRhLCAzKQ0KDQoNCmBgYA0KDQpBcmUgdGhlIGRpc3RyaWJ1dGlvbnMgc3ltbWV0cmljIG9yIHNrZXdlZD8NCj09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PQ0KDQpgYGAge3J9IA0KDQpzdW1tYXJ5KG9qX2RhdGEpDQoNCmBgYA0KDQorIFRoZSBkaXN0cm9idXRpb25zIG9mIHByaWNlIGFyZSB2ZXJ5IHN5bW1ldHJpYw==</div>
 
 
 

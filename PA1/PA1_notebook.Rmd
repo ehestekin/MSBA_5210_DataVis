@@ -1,0 +1,28 @@
+---
+title: "PA1 OJ: Minute Maid vs Citrus Hill Purchases"
+date:  "1/9/20"
+output: html_notebook
+---
+
+``` {r echo = FALSE}
+# Course: 5210 Communicating Data
+# Purpose: Analyze orange juice purchases
+# Date: 1/9/20
+# Author: Eric Hestekin
+```
+
+``` {r echo = FALSE}
+# Clear environment of variables and functions
+rm(list = ls(all = TRUE)) 
+
+# Clear environmet of packages
+if(is.null(sessionInfo()$otherPkgs) == FALSE)lapply(paste("package:", names(sessionInfo()$otherPkgs), sep=""), detach, character.only = TRUE, unload = TRUE)
+
+```
+
+``` {r setup, include = FALSE, warning = FALSE}
+# Load Library
+library(tidyverse)
+
+```
+

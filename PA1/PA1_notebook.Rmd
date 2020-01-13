@@ -4,6 +4,8 @@ date:  "1/9/20"
 output: html_notebook
 ---
 
+Repo:  https://github.com/ehestekin/MSBA_5210_DataVis
+
 ``` {r echo = FALSE}
 # Course: 5210 Communicating Data
 # Purpose: Analyze orange juice purchases

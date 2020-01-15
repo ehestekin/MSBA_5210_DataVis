@@ -111,7 +111,8 @@ ggplot(data = oj_data, mapping = aes(x = PriceMM - DiscMM)) +
   geom_histogram(binwidth = 0.02, fill = 'orange') +
   xlim(1.65,2.3) +
   ylim(-25, 300) + 
-  xlab('Minute Maid Sales Price ($)'),
+  xlab('Minute Maid Sales Price ($)') +
+  ggtitle('Orange Juice Sales by Price'),
 # binwidth of 2cents for prices
 
 ggplot(data = oj_data, mapping = aes(x = PriceCH - DiscCH)) + 
@@ -125,7 +126,7 @@ ncol = 1)
 
 + Distribution of prices for Citrus Hill significantly lower than Minute Maid
 
-``` {R}
+``` {R, warning = FALSE}
 
 #add similar box plot to clarify distributions
 grid.arrange(
@@ -133,15 +134,36 @@ ggplot(data = oj_data, mapping = aes(x = 1)) +
   geom_boxplot(mapping = aes(y = PriceMM - DiscMM), fill = 'orange') +
   coord_flip() + 
   ylim(1.65,2.3) +
-  xlab(''),
+  xlab('') +
+  ylab('Minute Maid Sales Price ($)') +
+  ggtitle('Orange Juice Sales by Price'),
 
 ggplot(data = oj_data, mapping = aes(x = 1)) +
   geom_boxplot(mapping = aes(y = PriceCH - DiscCH), fill = 'orange') + 
   coord_flip() + 
   ylim(1.65,2.3) +
-  xlab(''),
+  xlab('') +
+  ylab('Citrus Hill Sales Price ($)'),
 
 ncol = 1)
+
+# ggsave(filename = 'OJ_prices_boxplot.png', plot = last_plot() + ggtitle('Orange Juice Sales by Price'))
 ```
 
-+ Confirm average price and overall distribution of price is lower for Citris Hill
++ Confirmed average price and overall distribution of price is lower for Citris Hill
+
+``` {R}
+
+#Bar plot for store sales distribution
+
+ggplot(data = oj_data, mapping = aes(x = STORE)) +
+  geom_bar(fill = c('orange','grey','grey','grey','grey')) +
+  ylab('Unit Sales') +
+  xlab('Store ID') + 
+  ggtitle('OJ Sales by Store')
+  #colored sales leader orange to stick out
+
+
+```
+
+

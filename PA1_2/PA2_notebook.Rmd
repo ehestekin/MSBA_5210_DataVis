@@ -1,14 +1,14 @@
 ---
 title: 'PA1 OJ: Minute Maid vs Citrus Hill Purchases'
 output:
-  word_document:
-    toc: yes
-    toc_depth: '3'
   html_document:
     number_sections: yes
     toc: yes
     toc_depth: 3
     toc_float: yes
+  word_document:
+    toc: yes
+    toc_depth: '3'
 date: "1/9/20"
 ---
 
@@ -35,6 +35,7 @@ if(is.null(sessionInfo()$otherPkgs) == FALSE)lapply(paste("package:", names(sess
 ``` {r setup, include = FALSE, warning = FALSE}
 # Load Library
 library(tidyverse)
+library(gridExtra)
 
 ```
 
@@ -70,8 +71,8 @@ Which brand sells the most?
 
 ``` {r}
 
-# add column for which price is lower
-oj_data <- mutate(oj_data, ch_lower_price = PriceCH < PriceMM)
+# add column for which price is lower (must account for discount)
+oj_data <- mutate(oj_data, ch_lower_price = (PriceCH - DiscCH) < (PriceMM - DiscMM))
 
 #test affect of lower price on purchase TODO
 
@@ -103,4 +104,44 @@ Other comments/questions from EDA of data?
 Graphical Analysis
 ==================
 
+``` {R, warning = FALSE}
 
+grid.arrange(
+ggplot(data = oj_data, mapping = aes(x = PriceMM - DiscMM)) +
+  geom_histogram(binwidth = 0.02, fill = 'orange') +
+  xlim(1.65,2.3) +
+  ylim(-25, 300) + 
+  xlab('Minute Maid Sales Price ($)'),
+# binwidth of 2cents for prices
+
+ggplot(data = oj_data, mapping = aes(x = PriceCH - DiscCH)) + 
+  geom_histogram(binwidth = 0.02, fill = 'orange') +
+  xlim(1.65,2.3) +
+  ylim(-25, 300) +
+  xlab('Citrus Hill Sales Price ($)'),
+ncol = 1)
+
+```
+
++ Distribution of prices for Citrus Hill significantly lower than Minute Maid
+
+``` {R}
+
+#add similar box plot to clarify distributions
+grid.arrange(
+ggplot(data = oj_data, mapping = aes(x = 1)) +
+  geom_boxplot(mapping = aes(y = PriceMM - DiscMM), fill = 'orange') +
+  coord_flip() + 
+  ylim(1.65,2.3) +
+  xlab(''),
+
+ggplot(data = oj_data, mapping = aes(x = 1)) +
+  geom_boxplot(mapping = aes(y = PriceCH - DiscCH), fill = 'orange') + 
+  coord_flip() + 
+  ylim(1.65,2.3) +
+  xlab(''),
+
+ncol = 1)
+```
+
++ Confirm average price and overall distribution of price is lower for Citris Hill

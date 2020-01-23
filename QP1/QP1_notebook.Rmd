@@ -2,15 +2,20 @@
 title: "QP1: King County Housing Price Analysis"
 author: "Eric Hestekin"
 date: "1/23/2020"
-output: html_document
+output: 
+  html_document:
+    number_sections: yes
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
 ---
 
 Repo:  https://github.com/ehestekin/MSBA_5210_DataVis
 
 ``` {r echo = FALSE}
 # Course: 5210 Communicating Data
-# Purpose: Analyze orange juice purchases
-# Date: 1/9/20
+# Purpose: Analyze king county housing prices
+# Date: 1/23/20
 # Author: Eric Hestekin
 # Repo:  https://github.com/ehestekin/MSBA_5210_DataVis
 ```
@@ -28,5 +33,127 @@ if(is.null(sessionInfo()$otherPkgs) == FALSE)lapply(paste("package:", names(sess
 # Load Library
 library(tidyverse)
 library(gridExtra)
+library(janitor)
+library(knitr)
 
 ```
+
+Load data and get initial summary
+=================================
+_Uni-variate non-graphical_
+
+```{r}
+#load data and print column names and first few rows
+house_data <- read.csv('qp1_data.csv')
+
+head(house_data, 5)
+#get stats of basic housing quantitative data
+summary(house_data[,1:5])
+#categorical data
+summary(house_data[,c('view','grade','condition','yr_built')])
+#waterfront frequency
+num_wf <- sum(house_data$waterfront)
+num_wf
+#percentage
+round(num_wf / nrow(house_data) * 100, 2)
+
+#sort by zip
+house_data_by_zip <- house_data %>% group_by(zip_code) %>% 
+  summarize_all(.funs = mean)
+
+#add count.  couldn't figure out how to do this along with summarize_all
+count <- tally(group_by(house_data, zip_code))
+
+house_data_by_zip <- left_join(house_data_by_zip, count, by = "zip_code")
+
+
+```
+
+### Comments
+
++ Large range of house size and price (expected)
+  + Right skewed
+  
++ Not very many houses have a view.  Only upper quarter.
+  + Similarly less than 1% are waterfront
+
++ Grade and condition both mostly symmetrically distributed
+  + Median value for both is the middle rating.  No major bias.
+  + Slight right skew.  Maybe due to average house being sold is above average   condition at time of sale?
+  
++ Year is slightly left skewed.  Implies many older homes being sold.
+
+### Questions
+
++ Location (zip code) effect on price for similar size house
+
++ Sqft vs number of bed/bath.  Size of yard effect?
+  + I think size of yard would be sqft_lot - sqft_house / num_floors
+
++ Effect of year on price as well as renovation year
+
++ Shape of relationship between condition and price
+
+Uni-variate graphical analysis
+==============================
+
+``` {r}
+
+ggplot(house_data, mapping = aes(x = price)) +
+  geom_histogram(binwidth = 50000)
+
+#zoom on houses < 1.5mil
+ggplot(house_data, mapping = aes(x = price)) +
+  geom_histogram(binwidth = 50000) +
+  xlim(0, 1.5e6) +
+  ggtitle('King Co. Home Price Distribution', subtitle = 'Houses under 1.5mil only')
+
+# house with view distro
+ggplot(house_data, mapping = aes(x = view)) +
+  geom_histogram(binwidth = 1)
+
+#count houses with view (similar to waterfront above)
+count(house_data, vars = view)
+
+#year built distro
+ggplot(house_data, mapping = aes(x = yr_built)) +
+  geom_histogram(binwidth = 2) + 
+  ggtitle('King Co. House Sale Home Build Year')
+
+#house and yard sizes
+# add yard size variable.  subtract footprint of house
+# use floor function on floors (ha) to account for split levels
+house_data <- house_data %>% mutate(sqft_yard = sqft_lot - (sqft_living / floor(floors)))
+
+ggplot(house_data, mapping = aes(x = sqft_living)) +
+  geom_histogram(binwidth = 50)
+
+ggplot(house_data, mapping = aes(x = sqft_lot)) +
+  geom_histogram(binwidth = 500) +
+  xlim(0,5e4)
+
+#look at price/sqft lot
+ggplot(house_data, mapping = aes(x = price / sqft_lot)) +
+  geom_histogram(binwidth = 10) +
+  xlim(0,500)
+
+```
+
+### Comments
+
++ Price and Price per sqft have similar distributions
+
++ Only `r round(19489/21613, 2) *100`% of homes have a view
+
++ More newer houses than old which makes sense
+  + Can see a major downturn around 1930 (great depression) and similar dips in 1970 and 2010 (recessions).  Makes sense fewer homes sold from those times as fewer homes were being built.
+  
++ Square footage distributions look similar to price distros
+
+### Questions
+
++ How closely related are price and square footage?
+
++ Impact of rare view or waterfront on price
+
++ Impact of age of home and how much remodel effects

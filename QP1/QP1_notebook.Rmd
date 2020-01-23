@@ -66,6 +66,12 @@ count <- tally(group_by(house_data, zip_code))
 
 house_data_by_zip <- left_join(house_data_by_zip, count, by = "zip_code")
 
+# Get 5 cheapest and most expensive zip codes
+house_data_by_zip <- house_data_by_zip %>% arrange(price)
+
+five_cheapest_zips = house_data_by_zip[1:5,'zip_code']
+num_zips <- nrow(house_data_by_zip)
+five_expense_zips  = house_data_by_zip[(num_zips-4):num_zips,'zip_code']
 
 ```
 
@@ -157,3 +163,71 @@ ggplot(house_data, mapping = aes(x = price / sqft_lot)) +
 + Impact of rare view or waterfront on price
 
 + Impact of age of home and how much remodel effects
+
+Non Graphical Multivariate Analysis
+===================================
+
+``` {r}
+
+# first test correlations of price with various factors
+
+house_data %>% select(price,sqft_living, sqft_lot) %>% 
+  cor() %>% round(3) %>% kable()
+
+house_data %>% select(price, sqft_living, yr_built) %>% 
+  cor() %>% round(3) %>% kable()
+
+# condition vs age
+house_data %>% select(yr_built, condition) %>% 
+  cor() %>% round(3) %>% kable()
+
+```
+
+### Comments
+
++ Strong correlation between price and living sq ft
+  + Not much of a correlation for lot size
+  
++ Age and price not directly correlated.
+  + Age and square footage have a stronger correlation.
+    + Implies houses have been getting bigger as time goes on
+    
++ Negative correlation between condition and year which makes sense
+  + Same as a positve correlation between _age_ and condition
+  
+Multivariate Graphical Analysis
+===============================
+
+``` {r}
+
+# continue looking into correlated variables
+ggplot(house_data, mapping = aes(sqft_living, price)) +
+  geom_point()
+
+#effect of view
+view_group <- house_data %>% group_by(view) %>% summarize(avg = mean(price))
+
+ggplot(view_group, mapping = aes(x = view, y = avg)) +
+  geom_bar(stat = 'identity')
+
+#cool alternate way without doing group_by into a new df
+ggplot(house_data, mapping = aes(x = view, y  = price)) +
+  geom_bar(stat = 'summary')
+
+#plot price per sqft and add color for most expensive and least expensive zips
+#first make subset of data
+house_data_5_expense_zips <- house_data[house_data$zip_code %in% five_expense_zips$zip_code,]
+ggplot(house_data,mapping = aes(sqft_living, price)) +
+  geom_point() +
+  geom_point(house_data_5_expense_zips, mapping = aes(sqft_living, price),color = 'red')
+
+#try similar idea with histogram
+ggplot(house_data, mapping = aes(x = price)) +
+  geom_histogram(binwidth = 50000) +
+  xlim(0, 1.5e6) +
+  geom_histogram(data = house_data_5_expense_zips, mapping = aes(price)
+                 , fill = 'red', binwidth = 50000)
+
+#would need to normalize above plot because it is hard to see.  good idea for later
+
+```

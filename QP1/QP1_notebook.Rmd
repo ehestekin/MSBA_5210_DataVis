@@ -230,4 +230,58 @@ ggplot(house_data, mapping = aes(x = price)) +
 
 #would need to normalize above plot because it is hard to see.  good idea for later
 
+#condition vs price
+ggplot(house_data, mapping = aes(x = condition, y = price / sqft_living)) +
+  geom_point() +
+  geom_point(house_data_5_expense_zips, mapping = aes(x = condition, y = price / sqft_living), color = 'red')
+
+ggplot(house_data, mapping = aes(sqft_living, price)) +
+  geom_point() +
+  geom_smooth(method = 'lm')#do smooth for each condition, see if slopes are same
+
+```
+
+Refine Plots
+============
+
+```` {R}
+
+# view vs price
+
+ggplot(house_data, mapping = aes(x = view, y  = price)) +
+  geom_bar(stat = 'summary', color = 'black', fill = c('#996666','#00aa78','#00aa78','#00aa78','#00aa78')) +
+  xlab('View Rating') +
+  ggtitle('Effect of View on House Prices') +
+  ylab('Average Price ($)')
+
+ggsave(filename = 'view_vs_price.png', plot = last_plot())
+
+# effect of age and renovations
+p_age <- ggplot(house_data, mapping = aes(x = yr_built, y = price / sqft_living)) +
+          geom_point(alpha = 0.1) + 
+          ggtitle('King Co. Home Build Year vs Price per SqFt') +
+          xlab('Home Build Year') +
+          ylab('Price per SqFt ($)')
+
+#add regression for year and rennovation
+build_yr_lm <- lm(price / sqft_living ~ yr_built, data = house_data)
+renov_only_data <- house_data %>% filter(yr_renovated > 0)
+renov_lm <- lm(price / sqft_living ~ yr_renovated, data = renov_only_data)
+
+#p_age <- p_age + geom_abline(slope = build_yr_lm$coefficients[2], intercept = build_yr_lm$coefficients[1], col = '#0000cc')
+
+#look at rennovation year with condition
+p_age <-  p_age + geom_abline(slope = renov_lm$coefficients[2], intercept = renov_lm$coefficients[1], col = '#cc0000')
+
+ggsave(filename = 'price_vs_yr_built.png', plot = p_age)
+
+# condition
+ggplot(house_data, mapping = aes(x= condition, y = price)) +
+  geom_bar(stat = 'summary', color = 'black', fill = c('#996666','#996666','#00aa78','#00aa78','#00aa78')) +
+  xlab('Condition Rating') +
+  ylab('Average Sale Price ($)') +
+  ggtitle('House Condition vs Sale Price')
+  
+  ggsave(filename = 'condition_vs_price.png', plot = last_plot())
+
 ```

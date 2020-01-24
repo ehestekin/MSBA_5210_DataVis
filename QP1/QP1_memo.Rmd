@@ -17,7 +17,7 @@ As the above plot shows, going from no view to a modest view increases the avera
 
 ### Observation 2
 
-The second observation from the market data is how valuable a rennovation can be and similarly how important condition of the house is at time of sale.  It was found that for every year newer a rennovation is, the price per square foot of the home increases by close to one dollar.  This implies a home with a brand new renovation will be on average worth close to $10/sqft more than a similar house with a ten year old rennovation.  This insight could be valuable for customers considering renovating.
+The second observation from the market data is how valuable a renovation can be and similarly how important condition of the house is at time of sale.  It was found that for every year newer a renovation is, the price per square foot of the home increases by close to one dollar.  This implies a home with a brand new renovation will be on average worth close to $10/sqft more than a similar house with a ten year old renovation.  This insight could be valuable for customers considering renovating.
 
 ![](price_vs_yr_built.png)
 

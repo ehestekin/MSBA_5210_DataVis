@@ -1,0 +1,14 @@
+---
+  output: html_document
+---
+
+#### King County Housing Data Analysis
+
+#### Plot Improvements
+
+
+-------------------------------
+
+![](price_distro_smooth.png)
+
+![](price_vs_view_cleaned_up.png)

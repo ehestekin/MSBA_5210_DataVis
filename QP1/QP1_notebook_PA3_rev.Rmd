@@ -1,0 +1,333 @@
+---
+title: "QP1: King County Housing Price Analysis"
+author: "Eric Hestekin"
+date: "1/23/2020"
+output: 
+  html_document:
+    number_sections: yes
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+---
+
+Repo:  https://github.com/ehestekin/MSBA_5210_DataVis
+
+``` {r echo = FALSE}
+# Course: 5210 Communicating Data
+# Purpose: Analyze king county housing prices
+# Date: 1/23/20
+# Author: Eric Hestekin
+# Repo:  https://github.com/ehestekin/MSBA_5210_DataVis
+```
+
+``` {r echo = FALSE, include = FALSE}
+# Clear environment of variables and functions
+rm(list = ls(all = TRUE)) 
+
+# Clear environmet of packages
+if(is.null(sessionInfo()$otherPkgs) == FALSE)lapply(paste("package:", names(sessionInfo()$otherPkgs), sep=""), detach, character.only = TRUE, unload = TRUE)
+
+```
+
+``` {r setup, include = FALSE, warning = FALSE}
+# Load Library
+library(tidyverse)
+library(gridExtra)
+library(janitor)
+library(knitr)
+
+```
+
+Load data and get initial summary
+=================================
+_Uni-variate non-graphical_
+
+```{r}
+#load data and print column names and first few rows
+house_data <- read.csv('qp1_data.csv')
+
+head(house_data, 5)
+#get stats of basic housing quantitative data
+summary(house_data[,1:5])
+#categorical data
+summary(house_data[,c('view','grade','condition','yr_built')])
+#waterfront frequency
+num_wf <- sum(house_data$waterfront)
+num_wf
+#percentage
+round(num_wf / nrow(house_data) * 100, 2)
+
+#sort by zip
+house_data_by_zip <- house_data %>% group_by(zip_code) %>% 
+  summarize_all(.funs = mean)
+
+#add count.  couldn't figure out how to do this along with summarize_all
+count <- tally(group_by(house_data, zip_code))
+
+house_data_by_zip <- left_join(house_data_by_zip, count, by = "zip_code")
+
+# Get 5 cheapest and most expensive zip codes
+house_data_by_zip <- house_data_by_zip %>% arrange(price)
+
+five_cheapest_zips = house_data_by_zip[1:5,'zip_code']
+num_zips <- nrow(house_data_by_zip)
+five_expense_zips  = house_data_by_zip[(num_zips-4):num_zips,'zip_code']
+
+```
+
+### Comments
+
++ Large range of house size and price (expected)
+  + Right skewed
+  
++ Not very many houses have a view.  Only upper quarter.
+  + Similarly less than 1% are waterfront
+
++ Grade and condition both mostly symmetrically distributed
+  + Median value for both is the middle rating.  No major bias.
+  + Slight right skew.  Maybe due to average house being sold is above average   condition at time of sale?
+  
++ Year is slightly left skewed.  Implies many older homes being sold.
+
+### Questions
+
++ Location (zip code) effect on price for similar size house
+
++ Sqft vs number of bed/bath.  Size of yard effect?
+  + I think size of yard would be sqft_lot - sqft_house / num_floors
+
++ Effect of year on price as well as renovation year
+
++ Shape of relationship between condition and price
+
+Uni-variate graphical analysis
+==============================
+
+``` {r}
+
+ggplot(house_data, mapping = aes(x = price)) +
+  geom_histogram(binwidth = 50000)
+
+#zoom on houses < 1.5mil
+ggplot(house_data, mapping = aes(x = price)) +
+  geom_histogram(binwidth = 50000) +
+  xlim(0, 1.5e6) +
+  ggtitle('King Co. Home Price Distribution', subtitle = 'Houses under 1.5mil only')
+
+# house with view distro
+ggplot(house_data, mapping = aes(x = view)) +
+  geom_histogram(binwidth = 1)
+
+#count houses with view (similar to waterfront above)
+count(house_data, vars = view)
+
+#year built distro
+ggplot(house_data, mapping = aes(x = yr_built)) +
+  geom_histogram(binwidth = 2) + 
+  ggtitle('King Co. House Sale Home Build Year')
+
+#house and yard sizes
+# add yard size variable.  subtract footprint of house
+# use floor function on floors (ha) to account for split levels
+house_data <- house_data %>% mutate(sqft_yard = sqft_lot - (sqft_living / floor(floors)))
+
+ggplot(house_data, mapping = aes(x = sqft_living)) +
+  geom_histogram(binwidth = 50)
+
+ggplot(house_data, mapping = aes(x = sqft_lot)) +
+  geom_histogram(binwidth = 500) +
+  xlim(0,5e4)
+
+#look at price/sqft lot
+ggplot(house_data, mapping = aes(x = price / sqft_lot)) +
+  geom_histogram(binwidth = 10) +
+  xlim(0,500)
+
+```
+
+### Comments
+
++ Price and Price per sqft have similar distributions
+
++ Only `r round(19489/21613, 2) *100`% of homes have a view
+
++ More newer houses than old which makes sense
+  + Can see a major downturn around 1930 (great depression) and similar dips in 1970 and 2010 (recessions).  Makes sense fewer homes sold from those times as fewer homes were being built.
+  
++ Square footage distributions look similar to price distros
+
+### Questions
+
++ How closely related are price and square footage?
+
++ Impact of rare view or waterfront on price
+
++ Impact of age of home and how much remodel effects
+
+Non Graphical Multivariate Analysis
+===================================
+
+``` {r}
+
+# first test correlations of price with various factors
+
+house_data %>% select(price,sqft_living, sqft_lot) %>% 
+  cor() %>% round(3) %>% kable()
+
+house_data %>% select(price, sqft_living, yr_built) %>% 
+  cor() %>% round(3) %>% kable()
+
+# condition vs age
+house_data %>% select(yr_built, condition) %>% 
+  cor() %>% round(3) %>% kable()
+
+```
+
+### Comments
+
++ Strong correlation between price and living sq ft
+  + Not much of a correlation for lot size
+  
++ Age and price not directly correlated.
+  + Age and square footage have a stronger correlation.
+    + Implies houses have been getting bigger as time goes on
+    
++ Negative correlation between condition and year which makes sense
+  + Same as a positve correlation between _age_ and condition
+  
+Multivariate Graphical Analysis
+===============================
+
+``` {r}
+
+# continue looking into correlated variables
+ggplot(house_data, mapping = aes(sqft_living, price)) +
+  geom_point()
+
+#effect of view
+view_group <- house_data %>% group_by(view) %>% summarize(avg = mean(price))
+
+ggplot(view_group, mapping = aes(x = view, y = avg)) +
+  geom_bar(stat = 'identity')
+
+#cool alternate way without doing group_by into a new df
+ggplot(house_data, mapping = aes(x = view, y  = price)) +
+  geom_bar(stat = 'summary')
+
+#plot price per sqft and add color for most expensive and least expensive zips
+#first make subset of data
+house_data_5_expense_zips <- house_data[house_data$zip_code %in% five_expense_zips$zip_code,]
+ggplot(house_data,mapping = aes(sqft_living, price)) +
+  geom_point() +
+  geom_point(house_data_5_expense_zips, mapping = aes(sqft_living, price),color = 'red')
+
+#try similar idea with histogram
+ggplot(house_data, mapping = aes(x = price)) +
+  geom_histogram(binwidth = 50000) +
+  xlim(0, 1.5e6) +
+  geom_histogram(data = house_data_5_expense_zips, mapping = aes(price)
+                 , fill = 'red', binwidth = 50000)
+
+#would need to normalize above plot because it is hard to see.  good idea for later
+
+#condition vs price
+ggplot(house_data, mapping = aes(x = condition, y = price / sqft_living)) +
+  geom_point() +
+  geom_point(house_data_5_expense_zips, mapping = aes(x = condition, y = price / sqft_living), color = 'red')
+
+ggplot(house_data, mapping = aes(sqft_living, price)) +
+  geom_point() +
+  geom_smooth(method = 'lm')#do smooth for each condition, see if slopes are same
+
+```
+
+Refine Plots
+============
+
+```` {R}
+
+# view vs price
+
+ggplot(house_data, mapping = aes(x = view, y  = price)) +
+  geom_bar(stat = 'summary', color = 'black', fill = c('#996666','#00aa78','#00aa78','#00aa78','#00aa78')) +
+  xlab('View Rating') +
+  ggtitle('Effect of View on House Prices') +
+  ylab('Average Price ($)')
+
+ggsave(filename = 'view_vs_price.png', plot = last_plot())
+
+# effect of age and renovations
+p_age <- ggplot(house_data, mapping = aes(x = yr_built, y = price / sqft_living)) +
+          geom_point(alpha = 0.1) + 
+          ggtitle('King Co. Home Build Year vs Price per SqFt') +
+          xlab('Home Build Year') +
+          ylab('Price per SqFt ($)')
+
+#add regression for year and rennovation
+build_yr_lm <- lm(price / sqft_living ~ yr_built, data = house_data)
+renov_only_data <- house_data %>% filter(yr_renovated > 0)
+renov_lm <- lm(price / sqft_living ~ yr_renovated, data = renov_only_data)
+
+#p_age <- p_age + geom_abline(slope = build_yr_lm$coefficients[2], intercept = build_yr_lm$coefficients[1], col = '#0000cc')
+
+#look at rennovation year with condition
+p_age <-  p_age + geom_abline(slope = renov_lm$coefficients[2], intercept = renov_lm$coefficients[1], col = '#cc0000')
+
+ggsave(filename = 'price_vs_yr_built.png', plot = p_age)
+
+# condition
+ggplot(house_data, mapping = aes(x= condition, y = price)) +
+  geom_bar(stat = 'summary', color = 'black', fill = c('#996666','#996666','#00aa78','#00aa78','#00aa78')) +
+  xlab('Condition Rating') +
+  ylab('Average Sale Price ($)') +
+  ggtitle('House Condition vs Sale Price')
+  
+  ggsave(filename = 'condition_vs_price.png', plot = last_plot())
+
+```
+
+Apply Best Practices to Plots
+=============================
+
+``` {r}
+
+#clean up view vs price chart
+
+ggplot(house_data, mapping = aes(x = view, y  = price)) +
+  geom_line(stat = 'summary', fun.y = 'median') +
+  geom_point(stat = 'summary', fun.y = 'median') +
+  xlab('View Rating') +
+  ggtitle('Home prices increase with better views') +
+  theme_classic() + 
+  scale_y_continuous('Median Price', labels = scales::dollar)
+
+ggsave('price_vs_view_cleaned_up.png', plot = last_plot())
+
+```
+
+``` {r, warning = FALSE, message = FALSE}
+
+house_data_5_cheap_zips <- house_data[house_data$zip_code %in% five_cheapest_zips$zip_code,]
+
+ggplot(house_data, mapping = aes(sqft_living,price)) +
+  geom_smooth(se = FALSE, color = 'black') +
+  geom_smooth(data = house_data_5_expense_zips, 
+              mapping = aes(sqft_living, price), 
+              se = FALSE, color = '#004d00', label = 'TEXTTEST') +
+  geom_smooth(data = house_data_5_cheap_zips, 
+              mapping = aes(sqft_living, price), 
+              se = FALSE, color = '#000099') +
+  theme_classic() +
+  scale_y_continuous('Price', labels = scales::dollar, limits = c(0, 2e6)) +
+  scale_x_continuous('Home Floor Area (sq ft)', limits = c(0,5000)) +
+  labs(title = 'Location, Location, Location', 
+       subtitle = 'Price per square foot varies greatly between wealthy and poor zip codes') +
+  geom_text(aes(x = 4000, y = 1.8e6, label = '5 most expensive zip codes'), 
+            color = '#004d00') +
+  geom_text(aes(x = 4000, y = 2.5e5, label = '5 least expensive zip codes'), 
+            color = '#000099') +
+  geom_text(aes(x = 4500, y = 9.5e5, label = 'All zip codes'), color = 'black')
+
+ggsave('price_distro_smooth.png', plot = last_plot())
+       
+```

@@ -32,11 +32,294 @@ if(is.null(sessionInfo()$otherPkgs) == FALSE)lapply(paste("package:", names(sess
 ``` {r setup, include = FALSE, warning = FALSE}
 # Load Library
 library(tidyverse)
-library(gridExtra)
+library(gridExtra) # Arranging charts
 library(janitor)
 library(knitr)
-
+library(scales) # Modifying axis tick mark labels on charts
+library(GGally) # Dumbbell and lollipop charts
+library(stringr) # Cleanup on key columns
 ```
 
-Load data and get initial summary
-=================================
+```{r}
+# Turn off scientific notation
+options(scipen = 999)
+```
+
+# Introduction to research
+
+## Initial expectations / biases
+
+- Not expecting significant seasonal trends, since cereal is a household staple
+- Less expensive cereals sell more, more expensive cereals sell less
+- More expensive cereals will sell more with promotions relative to without promotions
+
+# Load data and get initial summary
+
+```{r message = FALSE, warning = FALSE}
+# Load sales data
+sales_df <- read.csv("mtp_sales_data.csv")
+
+# Load product data
+product_df <- read.csv("mtp_product_data.csv")
+```
+
+# Uni-variate non-graphical analysis
+## Look at first 10 rows
+
+```{r message = FALSE, warning = FALSE}
+# Look at first 10 rows of sales_df
+head(sales_df, 10)
+
+# Look at first 10 rows of product_df
+head(product_df, 10)
+```
+
+**sales_df**
+
+- `UPC` formatting has periods rather than dashes, so many need cleanup before joining tables
+- `iri_key` is the store identifier, so rename later to make it clear
+
+**product_df**
+
+- check if `UPC` variable in `product_df` is unique for that table before joining
+- possibly pull text from `brand` variable to separate cereal from brand for cleaner groupings
+
+## Look at structure of both data frames
+
+```{r message = FALSE, warning = FALSE}
+# Look at structure of sales_df
+str(sales_df)
+
+# Look at structure of product_df
+str(product_df)
+```
+
+## Data Transformations
+
+```{r}
+# Check if UPC in product_df is unique
+duplicated(product_df$UPC)
+
+# Key cleanup in sales_df: replace periods with dashes
+sales_df$UPC <- str_replace_all(sales_df$UPC, "[.]", "-")
+
+# Key cleanup in product_df: remove first three characters
+product_df$UPC <- sub("00-", "", product_df$UPC)
+
+# Left join with sales_df as left table to preserve all sales data
+full_df <- left_join(sales_df, product_df, by = c("UPC", "UPC"))
+
+# Check for any null values in joined df
+sum(is.na(full_df)) # no null values
+
+# Rename iri_key variable for clarity
+full_df <- rename(full_df, "store_key" = iri_key)
+
+# Create new variables
+full_df <- mutate(full_df, 
+                  company = as.factor(
+                    ifelse(str_detect(full_df$brand, "KELLOGGS"), "Kellogg",
+                           ifelse(str_detect(full_df$brand, "GENERAL MILLS"), "General Mills", "Post"))),
+                  total_sales = units * price)
+```
+
+## Descriptive Statistics
+
+```{r}
+# View descriptive statistics to assess factor variables
+summary(full_df)
+```
+
+**Initial Observations**
+
+*store_key*
+
+- there are a large number of stores, so grouping by stores may not yield useful results
+
+*units*
+
+- mean slightly higher than the mean with outliers, so skewed to the right
+- what are the total units sold by brand? 
+
+*price*
+
+- roughly symmetric distribution
+- majority of items (75%) are $`r quantile(full_df$price, c(0.75), type = 1)` or less, regardless of brand
+- max price of $`r round(max(full_df$price),2)` indicates an outlier
+
+*promo*
+
+- majority of sold items (`r (1 - round(mean(full_df$promo),2))*100`%) do not have in-store promotions, so must be mindful of sample sizes
+
+*ad*
+
+- majority of sold items (`r round(sum(full_df$ad == "NONE") / dim(full_df)[1] * 100,2)`%) don't have ads
+
+*volume*
+
+- mean and median are about the same; use either as measure of central tendency
+- majority of items (75%) are `r quantile(full_df$volume, c(0.75), type = 1)` or less
+
+*flavor*
+
+- regular and toasted are the top two flavors
+
+*package*
+
+- `r round(sum(full_df$package == "BOX") / dim(full_df)[1] * 100,2)`% of observations come in a box
+
+# Uni-variate graphical analysis
+
+## Price
+
+```{r}
+# Price
+grid.arrange(
+  ggplot(data = full_df, mapping = aes(x = 1, y = price)) +
+    geom_boxplot() +
+    coord_flip(),
+  
+  ggplot(data = full_df, mapping = aes(x = price)) +
+    geom_histogram(),
+  
+  ncol = 1
+)
+```
+
+## Units
+
+```{r}
+# Units
+grid.arrange(
+  ggplot(data = full_df, mapping = aes(x = 1, y = units)) +
+    geom_boxplot() +
+    coord_flip(),
+  
+  ggplot(data = full_df, mapping = aes(x = units)) +
+    geom_histogram(),
+  
+  ncol = 1
+)
+```
+
+## Volume
+
+```{r}
+# volume
+grid.arrange(
+  ggplot(data = full_df, mapping = aes(x = 1, y = volume)) +
+    geom_boxplot() +
+    coord_flip(),
+  
+  ggplot(data = full_df, mapping = aes(x = volume)) +
+    geom_histogram(),
+  
+  ncol = 1
+)
+```
+
+## Brand
+
+```{r}
+# Count by brand
+ggplot(data = full_df, mapping = aes(x = brand)) +
+  geom_bar() +
+  coord_flip()
+```
+
+## Flavor
+
+```{r}
+# Count by flavor
+ggplot(data = full_df, mapping = aes(x = flavor)) +
+  geom_bar()
+```
+
+## Company
+
+```{r}
+# Count by company
+ggplot(data = full_df, mapping = aes(x = company)) +
+  geom_bar()
+```
+
+# Multi-variate non-graphical analysis
+
+## Categorical variables only
+
+### Promo vs. non-promo counts
+
+```{r}
+# Counts of promotional v. non-promotional observations to check sample sizes
+full_df %>% 
+  group_by(brand, promo) %>% 
+  summarise(count = n()) %>% 
+  pivot_wider(names_from = promo, values_from = count)
+```
+
+## Quantitative variables only
+
+## Categorical and quantitative variables
+
+### Promo vs. non-promo units sold by brand
+
+Want to check the counts by brand to review any potential issues with sample size
+
+```{r}
+# Units sold of promotional v. non-promotional by brand --- lollipop chart, sorted on descending by highest sales? As prop?
+full_df %>% 
+  group_by(brand, promo) %>% 
+  summarise(total_units = sum(units)) %>% 
+  pivot_wider(names_from = promo, values_from = total_units) %>%
+  rename("No_Promo" = "0",
+         "Promo" = "1")
+```
+
+- sample sizes for promotional items by brand look fine
+
+### Sales by company and brand
+
+```{r}
+# Sales volume and dollar amount by company
+# full_df %>% 
+#   group_by(company) %>% 
+#   summarise(units_sold = sum(units),
+#             p_units = sum(promo * units),
+#             percent_p_units = (round(p_units/units_sold,4)*100),
+#             total_sales = sum(total_sales),
+#             p_sales = sum(promo * units * price),
+#             percent_p_sales = round(p_sales/total_sales, 4)*100) %>% 
+#   arrange(desc(percent_p_units))
+
+# Sales volume and dollar amount by brand -- graph with fill = company to differentiate brands?
+full_df %>% 
+  group_by(brand) %>% 
+  summarise(total_sales = sum(total_sales),
+            p_sales = sum(promo * units * price), # sales that had promos
+            percent_p_sales = round(p_sales/total_sales, 4)*100) %>% 
+  arrange(desc(total_sales))
+```
+
+- General Mills has the lowest percentage of units sold and total sales that have promotions, but second highest in sales
+- Total sales appears to be positively correlated with total units sold; more units sold always yields higher sales
+- Some brands have a higher proportion of sales from promotions; generally, ones with the highest proportion have lowest sales
+
+### Sales across time period, overall and by brand or company
+
+```{r}
+# 
+```
+
+### Sales by flavor
+
+# Multi-variate graphical analysis
+
+# Detailed exploratory analysis
+
+# Statistical analysis
+
+# Regression analysis
+
+# Conclusions and final visualizations
+
+

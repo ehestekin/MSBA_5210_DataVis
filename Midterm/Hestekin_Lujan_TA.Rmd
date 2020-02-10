@@ -121,6 +121,12 @@ full_df <- mutate(full_df,
                     ifelse(str_detect(full_df$brand, "KELLOGGS"), "Kellogg",
                            ifelse(str_detect(full_df$brand, "GENERAL MILLS"),                                     "General Mills", "Post"))),
                   total_sales = units * price)
+
+#Add season for temperal analysis (week is too segmented)
+full_df <- full_df %>% 
+  mutate(season = (week %/% 14) + 1)
+#Note above is integer division where 14 is number of weeks per season plus 1 so that week 13 is put in the first season (similar with week 52)
+# The + 1 after the integer division is so seasons go 1 - 4 instead of 0 - 3
 ```
 
 ## Descriptive Statistics
@@ -339,12 +345,52 @@ full_df %>%
 ### Sales across time period, overall and by brand or company
 
 ```{r}
-# 
+#TODO : would like to grid.arrange these plots but couldn't figure it out when using group_by
+full_df %>% 
+  group_by(brand) %>% 
+  summarize(avg_wkly_sales = mean(total_sales),
+            all_sales = sum(total_sales)) %>% 
+  ggplot(mapping = aes(x = reorder(brand, avg_wkly_sales)
+                       , y = avg_wkly_sales)) +
+  geom_bar(stat = 'identity') +
+  coord_flip()
+
+full_df %>% 
+  group_by(brand) %>% 
+  summarize(avg_wkly_sales = mean(total_sales),
+            all_sales = sum(total_sales)) %>% 
+  ggplot(mapping = aes(x = reorder(brand, avg_wkly_sales), y = all_sales))+
+  geom_bar(stat = 'identity')+
+  coord_flip()
 ```
 
+Interesting the difference between the order between average weekly sales and total yearly sales.  Are more stores selling ceratin brands like frosted flakes?
+
+- Did sanity check on this group_by.  Cheerios total sales is equal to avg_weekly * count (seen above in brand section) so method checks out.
+-- Maybe there are more versions (UPCs) of some brands?
+
+### Check how many versions of each brand
+```{r}
+full_df %>% 
+  group_by(brand) %>% 
+  summarize(n = n_distinct(UPC))
+```
+
+Above table confirms suspision.  There are more unique versions (UPCs) of some cereals such as Froot Loops and Frosted Flakes.
+
 ### Sales by flavor
+``` {r}
+full_df %>% 
+  group_by(flavor) %>% 
+  summarize(n_flav = n()) %>% 
+  ggplot(mapping = aes(x = flavor, y = n_flav)) +
+    geom_bar(stat = 'identity')
+  
+```
 
 # Multi-variate graphical analysis
+
+
 
 # Detailed exploratory analysis
 

@@ -345,7 +345,8 @@ full_df %>%
 ### Sales across time period, overall and by brand or company
 
 ```{r}
-#TODO : would like to grid.arrange these plots but couldn't figure it out when using group_by
+
+grid.arrange(
 full_df %>% 
   group_by(brand) %>% 
   summarize(avg_wkly_sales = mean(total_sales),
@@ -353,7 +354,7 @@ full_df %>%
   ggplot(mapping = aes(x = reorder(brand, avg_wkly_sales)
                        , y = avg_wkly_sales)) +
   geom_bar(stat = 'identity') +
-  coord_flip()
+  coord_flip(),
 
 full_df %>% 
   group_by(brand) %>% 
@@ -361,7 +362,9 @@ full_df %>%
             all_sales = sum(total_sales)) %>% 
   ggplot(mapping = aes(x = reorder(brand, avg_wkly_sales), y = all_sales))+
   geom_bar(stat = 'identity')+
-  coord_flip()
+  coord_flip(),
+
+ncol = 1)
 ```
 
 Interesting the difference between the order between average weekly sales and total yearly sales.  Are more stores selling ceratin brands like frosted flakes?
@@ -382,8 +385,8 @@ Above table confirms suspision.  There are more unique versions (UPCs) of some c
 ``` {r}
 full_df %>% 
   group_by(flavor) %>% 
-  summarize(n_flav = n()) %>% 
-  ggplot(mapping = aes(x = flavor, y = n_flav)) +
+  summarize(sales_flav = sum(total_sales)) %>% 
+  ggplot(mapping = aes(x = flavor, y = sales_flav)) +
     geom_bar(stat = 'identity')
   
 ```

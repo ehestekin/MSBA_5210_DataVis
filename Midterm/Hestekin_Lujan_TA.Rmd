@@ -98,7 +98,7 @@ str(product_df)
 
 ```{r}
 # Check if UPC in product_df is unique
-duplicated(product_df$UPC)
+sum(duplicated(product_df$UPC))
 
 # Key cleanup in sales_df: replace periods with dashes
 sales_df$UPC <- str_replace_all(sales_df$UPC, "[.]", "-")
@@ -303,7 +303,8 @@ full_df %>%
 Want to check the counts by brand to review any potential issues with sample size
 
 ```{r}
-# Units sold of promotional v. non-promotional by brand --- lollipop chart, sorted on descending by highest sales? As prop?
+# Units sold of promotional v. non-promotional by brand 
+# For later: lollipop chart, sorted on descending by highest sales? As proportion?
 full_df %>% 
   group_by(brand, promo) %>% 
   summarise(total_units = sum(units)) %>% 
@@ -318,15 +319,15 @@ full_df %>%
 
 ```{r}
 # Sales volume and dollar amount by company
-# full_df %>% 
-#   group_by(company) %>% 
-#   summarise(units_sold = sum(units),
-#             p_units = sum(promo * units),
-#             percent_p_units = (round(p_units/units_sold,4)*100),
-#             total_sales = sum(total_sales),
-#             p_sales = sum(promo * units * price),
-#             percent_p_sales = round(p_sales/total_sales, 4)*100) %>% 
-#   arrange(desc(percent_p_units))
+full_df %>%
+  group_by(company) %>%
+  summarise(units_sold = sum(units),
+            p_units = sum(promo * units),
+            percent_p_units = (round(p_units/units_sold,4)*100),
+            total_sales = sum(total_sales),
+            p_sales = sum(promo * units * price),
+            percent_p_sales = round(p_sales/total_sales, 4)*100) %>%
+  arrange(desc(percent_p_units))
 
 # Sales volume and dollar amount by brand -- graph with fill = company to differentiate brands?
 full_df %>% 
@@ -337,14 +338,15 @@ full_df %>%
   arrange(desc(total_sales))
 ```
 
-- General Mills has the lowest percentage of units sold and total sales that have promotions, but second highest in sales
+- General Mills has the lowest percentage of promotional sales (both in units sold and total sales), but second highest in total dollar amount
 - Total sales appears to be positively correlated with total units sold; more units sold always yields higher sales
-- Some brands have a higher proportion of sales from promotions; generally, ones with the highest proportion have lowest sales
+- Some brands have a higher proportion of sales from promotions; generally, ones with the highest proportion of promotional items sold have lowest sales
 
 ### Sales across time period, overall and by brand or company
 
 ```{r}
-#TODO : would like to grid.arrange these plots but couldn't figure it out when using group_by
+
+grid.arrange(
 full_df %>% 
   group_by(brand) %>% 
   summarize(avg_wkly_sales = mean(total_sales),
@@ -352,7 +354,7 @@ full_df %>%
   ggplot(mapping = aes(x = reorder(brand, avg_wkly_sales)
                        , y = avg_wkly_sales)) +
   geom_bar(stat = 'identity') +
-  coord_flip()
+  coord_flip(),
 
 full_df %>% 
   group_by(brand) %>% 
@@ -360,7 +362,9 @@ full_df %>%
             all_sales = sum(total_sales)) %>% 
   ggplot(mapping = aes(x = reorder(brand, avg_wkly_sales), y = all_sales))+
   geom_bar(stat = 'identity')+
-  coord_flip()
+  coord_flip(),
+
+ncol = 1)
 ```
 
 Interesting the difference between the order between average weekly sales and total yearly sales.  Are more stores selling ceratin brands like frosted flakes?
@@ -372,24 +376,143 @@ Interesting the difference between the order between average weekly sales and to
 ```{r}
 full_df %>% 
   group_by(brand) %>% 
-  summarize(n = n_distinct(UPC))
+  summarize(n = n_distinct(UPC)) %>% 
+  arrange(desc(n))
 ```
 
 Above table confirms suspision.  There are more unique versions (UPCs) of some cereals such as Froot Loops and Frosted Flakes.
+
+```{r}
+# Sales by season
+```
+
 
 ### Sales by flavor
 ``` {r}
 full_df %>% 
   group_by(flavor) %>% 
-  summarize(n_flav = n()) %>% 
-  ggplot(mapping = aes(x = flavor, y = n_flav)) +
+  summarize(sales_flav = sum(total_sales)) %>% 
+  ggplot(mapping = aes(x = flavor, y = sales_flav)) +
     geom_bar(stat = 'identity')
   
 ```
 
 # Multi-variate graphical analysis
 
+```{r}
+# Comparing sales across companies
+full_df %>% 
+  group_by(company) %>% 
+  summarise(sales = sum(total_sales)) %>% 
+  ggplot(mapping = aes(x = reorder(company, sales), y = sales)) +
+  geom_col() +
+  coord_flip() +
+  labs(title = "Total sales by company")
 
+# Sales comparison with and without promos
+full_df %>% 
+  group_by(company, promo) %>% 
+  summarise(sales = sum(total_sales)) %>% 
+  ggplot(mapping = aes(x = reorder(company, sales), y = sales, group = promo)) +
+  geom_col() +
+  coord_flip() +
+  facet_grid(. ~ promo)
+
+# Sales comparison with and without ads
+# Excluding those without ads to more easily compare ad categories A and B
+full_df %>% 
+  group_by(company, ad) %>% 
+  filter(ad != "NONE") %>% 
+  summarise(sales = sum(total_sales)) %>% 
+  ggplot(mapping = aes(x = reorder(company, sales), y = sales, group = ad)) +
+  geom_col() +
+  geom_text(aes(label = sales)) +
+  coord_flip() +
+  facet_grid(. ~ ad)
+
+# Sales comparison only for products without ads
+full_df %>% 
+  group_by(company, ad) %>% 
+  filter(ad == "NONE") %>% 
+  summarise(sales = sum(total_sales)) %>% 
+  ggplot(mapping = aes(x = reorder(company, sales), y = sales)) +
+  geom_col() +
+  coord_flip() +
+  geom_text(aes(label = sales)) +
+  labs(title = "Sales by company, no ads",
+       y = "Company")
+
+```
+
+- When looking at total sales, sales with/without promos and with/without ads, Kellogg always has the highest, followed by General Mills and then Post. Assess for any changes to this pattern when looking at sales by brand.
+- Ad type "A" yields higher sales for Kellogg and General Mills while ad type "B" yields higher sales for Post.
+
+```{r}
+# Comparing sales across brands
+full_df %>% 
+  group_by(brand, company) %>% 
+  summarise(sales = sum(total_sales)) %>% 
+  ggplot(mapping = aes(x = reorder(brand, sales), y = sales, fill = company)) +
+  geom_col() +
+  coord_flip() +
+  labs(title = "Total sales by brand")
+
+# Sales comparison with and without promos
+grid.arrange(
+full_df %>% 
+  group_by(brand, company, promo) %>% 
+  filter(promo == 0) %>% 
+  summarise(sales = sum(total_sales)) %>% 
+  ggplot(mapping = aes(x = reorder(brand, sales), y = sales, fill = company)) +
+  geom_col() +
+  labs(title = "Sales by brand, without promos") +
+  coord_flip(),
+
+full_df %>% 
+  group_by(brand, company, promo) %>% 
+  filter(promo == 1) %>% 
+  summarise(sales = sum(total_sales)) %>% 
+  ggplot(mapping = aes(x = reorder(brand, sales), y = sales, fill = company)) +
+  geom_col() +
+  labs(title = "Sales by brand, with promos") +
+  coord_flip(),
+
+nrow = 2)
+
+# Sales comparison with and without ads
+# Excluding those without ads to more easily compare ad categories A and B
+grid.arrange(
+full_df %>% 
+  group_by(brand, company, ad) %>% 
+  filter(ad == "A") %>% 
+  summarise(sales = sum(total_sales)) %>% 
+  ggplot(mapping = aes(x = reorder(brand, sales), y = sales, fill = company)) +
+  geom_col() +
+  labs(title = "Sales by brand, ad type A") +
+  coord_flip(),
+
+full_df %>% 
+  group_by(brand, company, ad) %>% 
+  filter(ad == "B") %>% 
+  summarise(sales = sum(total_sales)) %>% 
+  ggplot(mapping = aes(x = reorder(brand, sales), y = sales, fill = company)) +
+  geom_col() +
+  labs(title = "Sales by brand, ad type B") +
+  coord_flip(),
+
+ncol = 1)
+
+# Sales comparison only for products without ads
+full_df %>% 
+  group_by(brand, company, ad) %>% 
+  filter(ad == "NONE") %>% 
+  summarise(sales = sum(total_sales)) %>% 
+  ggplot(mapping = aes(x = reorder(brand, sales), y = sales, fill = company)) +
+  geom_col() +
+  labs(title = "Sales by brand, no ad") +
+  coord_flip()
+
+```
 
 # Detailed exploratory analysis
 

@@ -115,18 +115,17 @@ sum(is.na(full_df)) # no null values
 # Rename iri_key variable for clarity
 full_df <- rename(full_df, "store_key" = iri_key)
 
-# Create new variables
+# Create new variables; 
 full_df <- mutate(full_df, 
                   company = as.factor(
                     ifelse(str_detect(full_df$brand, "KELLOGGS"), "Kellogg",
-                           ifelse(str_detect(full_df$brand, "GENERAL MILLS"),                                     "General Mills", "Post"))),
-                  total_sales = units * price)
+                           ifelse(str_detect(full_df$brand, "GENERAL MILLS"), "General Mills", "Post"))),
+                  total_sales = (units * price),
+                  season = (week %/% 14) + 1)
 
-#Add season for temperal analysis (week is too segmented)
-full_df <- full_df %>% 
-  mutate(season = (week %/% 14) + 1)
 #Note above is integer division where 14 is number of weeks per season plus 1 so that week 13 is put in the first season (similar with week 52)
 # The + 1 after the integer division is so seasons go 1 - 4 instead of 0 - 3
+
 ```
 
 ## Descriptive Statistics

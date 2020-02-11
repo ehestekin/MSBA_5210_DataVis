@@ -494,7 +494,7 @@ full_df %>%
   pivot_wider(names_from = season, values_from = sales)
 ```
 
-- sales seem to drop in season 4
+- sales seem to drop slightly in season 4
 
 ### Sales by flavor
 
@@ -506,6 +506,8 @@ full_df %>%
     geom_bar(stat = 'identity')
   
 ```
+
+- what do sales look like by company? Although Kellogg's sales are highest overall, are there any differences by flavor?
 
 ## Quantitative Variables
 
@@ -575,10 +577,20 @@ full_df %>%
   labs(title = "Sales by company, no ads",
        y = "Company")
 
+# Sales by company and flavor
+full_df %>% 
+  group_by(company, flavor) %>% 
+  summarise(sales = sum(total_sales)) %>% 
+  ggplot(mapping = aes(x = flavor, y = sales, group = company, fill = company)) +
+  geom_col(position = "dodge")
+
 ```
 
 - When looking at total sales, sales with/without promos and with/without ads, Kellogg always has the highest, followed by General Mills and then Post. Assess for any changes to this pattern when looking at sales by brand.
 - When there are ads, type "A" yields higher sales for Kellogg and General Mills while ad type "B" yields higher sales for Post.
+- General Mills has higher sales in cocoa and toasted flavors and does not appear competitive in regular flavor
+
+  - Why does it do better in these flavors relative to the competition? Are the price points better for these flavors? Are there any differences across ads / brands / promos?
 
 ### Sales across brands by promotions and ads
 
@@ -678,6 +690,64 @@ full_df %>%
   coord_flip()
 ```
 
+- each brand's sales are fairly evenly distributed across season; no notable differences apparent by brand
+
+```{r}
+# Line graph showing total sales by company for the year
+full_df %>% 
+  group_by(company, week) %>% 
+  summarise(sales = sum(total_sales)) %>% 
+  ggplot(mapping = aes(x = week, y = sales, group = company, color = company)) +
+  geom_line() +
+  theme_bw()
+
+# Line graphs showing total sales by company with promos vs without promos
+full_df %>% 
+  group_by(company, week, promo) %>% 
+  summarise(sales = sum(total_sales)) %>% 
+  ggplot(mapping = aes(x = week, y = sales, group = company, color = company)) + 
+  geom_line() +
+  facet_grid(promo ~ .) +
+  theme_bw()
+```
+
+- weekly sales follows the same pattern of Kellogg consistently having the highest sales; gap is closed a bit when we look at promos v no promos
+
+```{r}
+# Look at flavors where only General Mills and Kellogg compete
+grid.arrange(
+full_df %>% 
+  filter(flavor == "COCOA") %>% 
+  group_by(company, brand, week, flavor) %>% 
+  summarise(sales = sum(total_sales)) %>% 
+  ggplot(mapping = aes(x = week, y = sales, group = brand, color = company)) + 
+  geom_line() +
+  labs(title = "Weekly sales for Cocoa Flavor") +
+  theme_bw(),
+
+full_df %>% 
+  filter(flavor == "TOASTED") %>% 
+  group_by(company, brand, week, flavor) %>% 
+  summarise(sales = sum(total_sales)) %>% 
+  ggplot(mapping = aes(x = week, y = sales, group = brand, color = company)) + 
+  geom_line() +
+  labs(title = "Weekly sales for Toasted Flavor") +
+  theme_bw(),
+
+ncol = 1)
+
+# Look at flavors where only General Mills and Kellogg
+full_df %>% 
+  filter(flavor == "COCOA") %>% 
+  group_by(company, brand, week, promo, flavor) %>% 
+  summarise(sales = sum(total_sales)) %>% 
+  ggplot(mapping = aes(x = week, y = sales, group = brand, color = company)) + 
+  geom_line() +
+  facet_grid(promo ~ flavor) +
+  theme_bw()
+```
+
+- for cocoa flavor, General Mills had higher sales until about halfway through the year; what happened?
 
 ## Quantitative Variables
 

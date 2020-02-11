@@ -528,6 +528,29 @@ full_df %>%
 
 # Multi-variate graphical analysis
 
+``` {r}
+#interested in price/volume between promo and no promo for each company
+grid.arrange(
+  full_df[full_df$promo == 0,] %>% 
+    ggplot(mapping = aes(x = volume * units, y = total_sales, color = company)) +
+    geom_smooth() +
+    scale_x_continuous('Total Volume', limits = c(0,80)) +
+    scale_y_continuous('Total Sales', limits = c(0, 125)),
+  
+  full_df[full_df$promo == 1,] %>% 
+    ggplot(mapping = aes(x = volume * units, y = total_sales, color = company)) +
+    geom_smooth() +
+    scale_x_continuous('Total Volume',limits = c(0,80)) +
+    scale_y_continuous('Total Sales', limits = c(0, 125)),
+  
+  ncol = 1
+)
+  
+  
+```
+
+GM is getting beat on Price/Volume in both promo and non-promo sales
+
 ## Categorical Variables
 
 ### Sales comparison across promotions
@@ -676,8 +699,34 @@ full_df %>%
   ggplot(mapping = aes(x = brand, y = sales, fill = season)) +
   geom_col(position = "fill") +
   coord_flip()
+
 ```
 
+### Promos and Ads by Season for each company
+
+```{r}
+#Do some companies run more promotions at certain times of year?
+#Number of sales each season
+# full_df %>% 
+#   ggplot(mapping = aes(x = season, fill = company)) +
+#   geom_bar(position = 'dodge')
+
+grid.arrange(
+full_df %>% 
+  group_by(company,season) %>% 
+  summarize(n = n()) %>% 
+  ggplot(mapping = aes(x = season, y = n, color = company)) +
+  geom_line(),
+
+full_df %>% 
+  group_by(company, season) %>% 
+  summarize(n = n(), perc_promo = sum(promo)/n) %>% 
+  ggplot(mapping = aes(x = season, y = perc_promo, fill = company)) +
+  geom_bar(position = 'dodge', stat = 'identity'),
+
+ncol = 1
+)
+```
 
 ## Quantitative Variables
 
@@ -691,5 +740,5 @@ full_df %>%
 
 # Conclusions and final visualizations
 
-# TEST COMMIT CHANGE
+
 

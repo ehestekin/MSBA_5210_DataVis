@@ -736,6 +736,60 @@ ncol = 1
 
 # Statistical analysis
 
+Questions to answer:
++Significance of promos/ads on sales
++Seasonal differences signifcant?
++Price differences
+
+```{r}
+#check seasonal differences first
+z <- qnorm(0.975)
+
+full_df %>% 
+  group_by(company, season) %>% 
+  summarize(avg_sales = mean(total_sales), sd = sd(total_sales), 
+            n = n(), ci = z * sd/sqrt(n)) %>% 
+  ggplot(mapping = aes(x = season, y = avg_sales, color = company)) +
+  geom_line() +
+  geom_errorbar(aes(ymin = avg_sales - ci, ymax = avg_sales + ci), 
+                    width = 0.9, color = 'black')
+
+#very large standard deviations mean we cannot reject the null hypothesis that the average sales vary significantly between seasons.  
+#TODO: Need to test median as sales are right skewed
+
+```
+
+```{r}
+#next look at total volume and total sales between promos and not
+z <- qnorm(0.975)
+
+full_df %>% 
+  mutate(total_volume = units * volume) %>% 
+  group_by(company, promo) %>% 
+  summarize(avg_vol = mean(total_volume), avg_sales = mean(total_sales),
+            n = n(), sd_vol = sd(total_volume), sd_sales = sd(total_sales),
+            ci_vol = z * sd_vol/sqrt(n), ci_sales = z * sd_sales/sqrt(n)) %>% 
+  ggplot(mapping = aes(x = company, y = avg_vol, fill = as.factor(promo))) +
+  geom_bar(stat = 'identity', position = 'dodge') +
+  geom_errorbar(aes(ymin = avg_vol - ci_vol, ymax = avg_vol + ci_vol),
+                width = 0.75, position = position_dodge(0.9))
+  
+#note feels sloppy to copy this data setup part but piping another ggplot doesn't work
+full_df %>% 
+  mutate(total_volume = units * volume) %>% 
+  group_by(company, promo) %>% 
+  summarize(avg_vol = mean(total_volume), avg_sales = mean(total_sales),
+            n = n(), sd_vol = sd(total_volume), sd_sales = sd(total_sales),
+            ci_vol = z * sd_vol/sqrt(n), ci_sales = z * sd_sales/sqrt(n)) %>% 
+  ggplot(mapping = aes(x = company, y = avg_sales, fill = as.factor(promo))) +
+  geom_bar(stat = 'identity', position = 'dodge') +
+  geom_errorbar(aes(ymin = avg_sales - ci_sales, ymax = avg_sales + ci_sales),
+                width = 0.75, position = position_dodge(0.9))
+    
+
+```
+- All companies average significantly higher volumes with promos, but only Kellogg has significantly higher average *sales*
+
 # Regression analysis
 
 # Conclusions and final visualizations

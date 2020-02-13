@@ -126,7 +126,8 @@ full_df <- mutate(full_df,
                     ifelse(str_detect(full_df$brand, "KELLOGGS"), "Kellogg",
                            ifelse(str_detect(full_df$brand, "GENERAL MILLS"), "General Mills", "Post"))),
                   total_sales = (units * price),
-                  season = (week %/% 14) + 1)
+                  season = (week %/% 14) + 1,
+                  ad2 = ifelse(full_df$ad == "NONE", 0, 1))
 
 #Note above is integer division where 14 is number of weeks per season plus 1 so that week 13 is put in the first season (similar with week 52)
 # The + 1 after the integer division is so seasons go 1 - 4 instead of 0 - 3
@@ -530,9 +531,32 @@ full_df %>%
 
 # Multi-variate graphical analysis
 
+``` {r}
+#interested in price/volume between promo and no promo for each company
+grid.arrange(
+  full_df[full_df$promo == 0,] %>% 
+    ggplot(mapping = aes(x = volume * units, y = total_sales, color = company)) +
+    geom_smooth() +
+    scale_x_continuous('Total Volume', limits = c(0,80)) +
+    scale_y_continuous('Total Sales', limits = c(0, 125)),
+  
+  full_df[full_df$promo == 1,] %>% 
+    ggplot(mapping = aes(x = volume * units, y = total_sales, color = company)) +
+    geom_smooth() +
+    scale_x_continuous('Total Volume',limits = c(0,80)) +
+    scale_y_continuous('Total Sales', limits = c(0, 125)),
+  
+  ncol = 1
+)
+  
+  
+```
+
+GM is getting beat on Price/Volume in both promo and non-promo sales
+
 ## Categorical Variables
 
-### Sales comparison across promotions
+### Sales across companies by promos and ads
 
 ```{r}
 # Comparing sales across companies
@@ -672,6 +696,7 @@ Promotions
 
 - Without promos, General Mills sales are higher relative to other brands
 - With promos, General Mills sales are lower relative to other brands
+- Why does GM do better with total sales relative to other brands without promos?
 
 Ads
 
@@ -688,8 +713,10 @@ full_df %>%
   ggplot(mapping = aes(x = brand, y = sales, fill = season)) +
   geom_col(position = "fill") +
   coord_flip()
+
 ```
 
+<<<<<<< HEAD
 - each brand's sales are fairly evenly distributed across season; no notable differences apparent by brand
 
 ```{r}
@@ -712,9 +739,10 @@ full_df %>%
 ```
 
 - weekly sales follows the same pattern of Kellogg consistently having the highest sales; gap is closed a bit when we look at promos v no promos
+- This shows overall performance, but are there any differences when we look at brands or flavors?
 
 ```{r}
-# Look at flavors where only General Mills and Kellogg compete
+# Look at Cocoa and Toasted flavors only
 grid.arrange(
 full_df %>% 
   filter(flavor == "COCOA") %>% 
@@ -735,19 +763,37 @@ full_df %>%
   theme_bw(),
 
 ncol = 1)
-
-# Look at flavors where only General Mills and Kellogg
-full_df %>% 
-  filter(flavor == "COCOA") %>% 
-  group_by(company, brand, week, promo, flavor) %>% 
-  summarise(sales = sum(total_sales)) %>% 
-  ggplot(mapping = aes(x = week, y = sales, group = brand, color = company)) + 
-  geom_line() +
-  facet_grid(promo ~ flavor) +
-  theme_bw()
 ```
 
 - for cocoa flavor, General Mills had higher sales until about halfway through the year; what happened?
+- toasted flavor weekly sales also generally look higher for GM brands
+=======
+### Promos and Ads by Season for each company
+
+```{r}
+#Do some companies run more promotions at certain times of year?
+#Number of sales each season
+# full_df %>% 
+#   ggplot(mapping = aes(x = season, fill = company)) +
+#   geom_bar(position = 'dodge')
+
+grid.arrange(
+full_df %>% 
+  group_by(company,season) %>% 
+  summarize(n = n()) %>% 
+  ggplot(mapping = aes(x = season, y = n, color = company)) +
+  geom_line(),
+
+full_df %>% 
+  group_by(company, season) %>% 
+  summarize(n = n(), perc_promo = sum(promo)/n) %>% 
+  ggplot(mapping = aes(x = season, y = perc_promo, fill = company)) +
+  geom_bar(position = 'dodge', stat = 'identity'),
+
+ncol = 1
+)
+```
+>>>>>>> f5ba9766163b7d916e6d7e7f802b74b78178b92a
 
 ## Quantitative Variables
 
@@ -755,11 +801,266 @@ full_df %>%
 
 # Detailed exploratory analysis
 
+General Mills leads total sales for toasted flavor and cocoa flavor. Examine potential differences by promos / ads / time period to identify areas where General Mills might be doing better or worse than the competition. Specific question:
+
+- With flavor categories, do ads and promotions help or hurt General Mills sales?
+
+### Sales across brands and promos
+
+```{r}
+# Total sales across seasons for promos vs. no promos across flavors
+full_df %>% 
+  filter(flavor != "CINNAMON TOAST",
+         flavor != "FRUIT") %>% 
+  group_by(company, brand, season, promo, flavor) %>% 
+  summarise(sales = sum(total_sales)) %>% 
+  ggplot(mapping = aes(x = season, y = sales, group = company, fill = company)) + 
+  geom_col(position = "dodge") +
+  theme_bw() +
+  labs(title = "Total sales by company across flavors and promos") +
+  facet_grid(promo ~ flavor)
+```
+
+- We see that Kellogg picked up its Cocoa sales partway through the year
+- For toasted flavor, promos seem to hurt GM's competitiveness relative to Kellogg
+- For regular flavor, Kellogg is still highest overall with and without promos
+
+### Sales across brands and ads
+
+- For toasted flavor, GM is negatively impacted relative to competition with ads (either A or B)
+
+```{r}
+# Total Sales, ads v no ads
+full_df %>% 
+  #filter() %>% 
+  group_by(company, brand, season, ad2, flavor) %>% 
+  summarise(sales = sum(total_sales)) %>% 
+  ggplot(mapping = aes(x = season, y = sales, group = company, fill = company)) + 
+  geom_col(position = "dodge") +
+  theme_bw() +
+  labs(title = "Total sales across flavors, ads v no ads") +
+  facet_grid(ad2 ~ flavor)
+```
+
+- In regular regular, Kellogg maintains its lead ahead of other brands with and without promotions
+- In toasted flavor, General Mills loses its lead and appears to perform worse relative to Kellogg
+
+**Closer look at toasted flavor**
+
+```{r}
+# Total sales across seasons for promos vs. no promos for toasted flavor only, to compare against units sold
+full_df %>% 
+  filter(flavor == "TOASTED") %>% 
+  group_by(company, brand, season, promo) %>% 
+  summarise(sales = sum(total_sales)) %>% 
+  ggplot(mapping = aes(x = season, y = sales, group = brand, fill = brand)) + 
+  geom_col(position = "dodge") +
+  theme_bw() +
+  labs(title = "Total sales by brand for toasted flavor, promos vs no promos") +
+  facet_grid(promo ~ .)
+```
+
+- Without promos, Cheerios units sold and total sales is the highest of all brands
+- With promos, Cheerios sales volume is about even with other brands, at times lower
+- Promos appear to have a negative impact to the competitiveness of Cheerios relative to other toasted brands
+  - With promos, are the price points too similar between Cheerios and other brands?
+ 
 # Statistical analysis
+
+Overall, it looks like ads and promos have a negative impact on General Mills sales relative to the competition, even in the Toasted flavor category where General Mills leads overall in sales. Will focus on statistical testing on differences between companies for the toasted flavor category, assessing any major negative impacts of promotions and ads on General Mills sales.
+
+## Promos vs. no promos
+
+Assess differences in average weekly sales between General Mills and Kellogg when there are promotions and when there are no promotions.
+
+### Check distributions of the samples
+
+```{r}
+# Check boxplots of these samples
+full_df %>% 
+  filter(flavor == "TOASTED") %>% 
+  group_by(company, promo, week) %>% 
+  summarise(wkly_sales = sum(total_sales)) %>% 
+  ggplot(mapping = aes(x = company, y = wkly_sales)) +
+  geom_boxplot() +
+  labs(title = "Weekly sales for toasted flavor, with and without promos") +
+  facet_grid(.~promo)
+```
+
+- Boxplots show that GM weekly sales are higher than Kellogg without promos and lower than Kellogg with promos
+
+```{r}
+# Check distributions of these samples
+full_df %>% 
+  filter(flavor == "TOASTED") %>% 
+  group_by(company, promo, week) %>% 
+  summarise(wkly_sales = sum(total_sales)) %>% 
+  ggplot(mapping = aes(wkly_sales)) +
+  geom_histogram(binwidth = 175) +
+  facet_grid(promo ~ company) +
+  labs(title = "Distribution of toasted weekly sales by company, across promos")
+```
+
+- Histograms without promos show that the distributions of both samples are normally distributed
+  - Use means to test differences btwn. companies when there are no promos
+- Histograms with promos show slightly right-skewed
+  - Use medians to test differences btwn. companies when there are promos
+
+```{r}
+# Create new object to make hypothesis testing a bit easier, since I'm testing some very specific samples
+toasted <- 
+  full_df %>% 
+  filter(flavor == "TOASTED") %>% 
+  group_by(company, week, promo) %>% 
+  summarise(sales = sum(total_sales)) %>% 
+  pivot_wider(names_from = company, values_from = sales) %>% 
+  rename("General_Mills" = "General Mills")  
+  #mutate(difference = General_Mills - Kellogg)
+```
+
+### Test differences with promotions
+
+- Sample 1: Weekly sales of General Mills Toasted flavor cereals with promotions
+- Sample 2: Weekly sales of Kellogg Toasted flavor cereals with promotions
+
+When there are promotions for toasted flavor cereals, is there a stastically significant and practically significant difference in average weekly sales between companies?
+
+- Ho: GM avg. weekly sales - KG avg. weekly sales = 0
+- Ha: GM avg. weekly sales - KG avg. weekly sales != 0
+
+
+```{r}
+# Testing the median
+wilcox.test(toasted$General_Mills[toasted$promo == 1],
+            toasted$Kellogg[toasted$promo == 1],
+            conf.int = TRUE)
+```
+
+```{r}
+# Two-tailed test for differences between the means
+# t.test(toasted$General_Mills[toasted$promo == 1],
+#        toasted$Kellogg[toasted$promo == 1],
+#        conf.level = 0.95)
+```
+
+- We reject the null hypothesis
+- For toasted flavors, median weekly sales are statistically different between General Mills and Kellogg
+- On average, General Mills weekly sales are $196 less than Kellogg
+- Confidence interval shows us that 95% of the time, General Mills will have lower sales than Kellogg
+
+  - 95% of the time, General Mills median weekly toasted flavor sales will be between $268.48 and $113.57 less than Kellogg
+
+**Conclusion:** There is statistical evidence to support the claim that weekly sales of General Mills toasted flavor cereals are less than Kellogg cereals when there are promotions. Essentially, General Mills performs worse relative to the competition in toasted cereals when there are promotions.
+
+### Test differences without promotions
+
+- Sample 1: Weekly sales of General Mills Toasted flavor without promotions
+- Sample 2: Weekly sales of Kellogg Toasted flavor without promotions
+
+When there are no promotions for toasted flavor cereals, is there a stastically significant and practically significant difference in average weekly sales between companies?
+
+- Ho: GM avg. weekly sales - KG avg. weekly sales = 0
+- Ha: GM avg. weekly sales - KG avg. weekly sales != 0
+
+```{r}
+# Two-tailed test for differences about the means
+t.test(toasted$General_Mills[toasted$promo == 0],
+       toasted$Kellogg[toasted$promo == 0],
+       conf.level = 0.95)
+```
+
+- We reject the null hypothesis
+- For toasted flavors, avg. weekly sales are statistically different between General Mills and Kellogg
+- On average, General Mills weekly sales are $382 higher than Kellogg in toasted cereal flavors w/out promotions
+- Confidence interval shows us that 95% of the time, General Mills will have higher sales than Kellogg
+
+  - 95% of the time, General Mills weekly sales will be between $233.76 and $530.31 higher than Kellogg
+  
+**Conclusion:** There is statistical evidence to support the claim that, on average, weekly sales for General Mills toasted cereals are higher than Kellogg toasted cereals without promotions. In plain language, General Mills performs better relative to the competition in toasted cereals when there are no promotions.
+
+## Ads vs. no ads for toasted flavor cereals
+
+We are combining ad types A and B to increase sample sizes and test the difference of ads v. no ads because we found during EDA that there wasn't a substantial difference between ad types A and B.
+
+### Check distributions for the samples
+
+First, check the boxplots and histograms for the two samples:
+
+```{r}
+# Check boxplots of these samples
+full_df %>% 
+  filter(flavor == "TOASTED") %>% 
+  group_by(company, ad2, week) %>% 
+  summarise(wkly_sales = sum(total_sales)) %>% 
+  ggplot(mapping = aes(x = company, y = wkly_sales)) +
+  geom_boxplot() +
+  labs(title = "Weekly sales for toasted flavor, with and without ads") +
+  facet_grid(.~ad2)
+
+# Check distributions of these samples
+full_df %>% 
+  filter(flavor == "TOASTED") %>% 
+  group_by(company, ad2, week) %>% 
+  summarise(wkly_sales = sum(total_sales)) %>% 
+  ggplot(mapping = aes(wkly_sales)) +
+  geom_histogram(binwidth = 175) +
+  facet_grid(ad2 ~ company) +
+  labs(title = "Distribution of toasted weekly sales by company, ads v no ads")
+```
+
+- Boxplot shows there is a difference between ads and no ads;
+  - GM performs better relative to KG without ads, but worse with ads
+- Normal distribution without ads, right-skewed with ads
+  - Test median when testing with ads
+
+### With ads
+
+```{r}
+# Create new object to make hypothesis testing a bit easier
+toasted2 <- 
+  full_df %>% 
+  filter(flavor == "TOASTED") %>% 
+  group_by(company, week, ad2) %>% 
+  summarise(sales = sum(total_sales)) %>% 
+  pivot_wider(names_from = company, values_from = sales) %>% 
+  rename("General_Mills" = "General Mills")
+```
+
+
+- Sample 1: Weekly sales of General Mills Toasted flavor cereals with ads
+- Sample 2: Weekly sales of Kellogg Toasted flavor cereals with ads
+
+When there are ads for toasted flavor cereals, is there a stastically significant and practically significant difference in average weekly sales between companies?
+
+Ho: GM median weekly sales - KG median weekly sales = 0
+
+Ha: GM median weekly sales - KG median weekly sales != 0
+
+```{r}
+# Test the medians
+wilcox.test(toasted2$General_Mills[toasted2$ad2 == 1],
+            toasted2$Kellogg[toasted2$ad2 == 1],
+            conf.int = TRUE)
+```
+
+- reject the null hypothesis
+
+### Without ads
+
+```{r}
+# Two-tailed test for differences about the means
+t.test(toasted2$General_Mills[toasted$promo == 0],
+       toasted2$Kellogg[toasted$promo == 0],
+       conf.level = 0.95)
+```
+
+- reject the null hypothesis
 
 # Regression analysis
 
 # Conclusions and final visualizations
 
-# TEST COMMIT CHANGE
+
+
+
 

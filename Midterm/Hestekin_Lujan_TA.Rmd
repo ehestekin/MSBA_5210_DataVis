@@ -882,6 +882,24 @@ full_df %>%
 - General Mills:
   - Cheerios avg sales are lower with promos, while every other brand increases or stays the same
   - Cheerios avg vol is about the same with and w/out promos while every other brand increases significantly
+  
+```{r}
+# Bar plots from above for General Mills Brands only
+# Average sales
+full_df %>% 
+  filter(company == "Kellogg") %>% 
+  mutate(total_volume = units * volume) %>% 
+  group_by(company, brand, promo) %>% 
+  summarize(avg_vol = mean(total_volume), avg_sales = mean(total_sales),
+            n = n(), sd_vol = sd(total_volume), sd_sales = sd(total_sales),
+            ci_vol = z * sd_vol/sqrt(n), ci_sales = z * sd_sales/sqrt(n)) %>% 
+  ggplot(mapping = aes(x = brand, y = avg_sales, fill = as.factor(promo))) +
+  geom_bar(stat = 'identity', position = 'dodge') +
+  coord_flip() +
+  labs(title = "Average sales for Kellogg's brands") +
+  geom_errorbar(aes(ymin = avg_sales - ci_sales, ymax = avg_sales + ci_sales),
+                width = 0.75, position = position_dodge(0.9))
+```
 
 ## Statistical tests
 
@@ -1355,4 +1373,9 @@ ggsave("figure1.png", width = 7.5, height = 5, units = "in")
 #   ggplot(mapping = aes(x = brand, y = avg_sales, group = promo, fill = as.factor(promo))) +
 #   geom_col(position = "dodge") +
 #   coord_flip()
+```
+
+```{r}
+# Save df for use in memo
+write_csv(full_df, path = 'full_df.csv')
 ```

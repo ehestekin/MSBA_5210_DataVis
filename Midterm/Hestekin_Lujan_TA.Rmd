@@ -36,7 +36,7 @@ library(gridExtra) # Arranging charts
 library(janitor)
 library(knitr)
 library(scales) # Modifying axis tick mark labels on charts
-library(GGally) # Dumbbell and lollipop charts
+library(ggalt) # Dumbbell and lollipop charts
 library(stringr) # Cleanup on key columns
 ```
 
@@ -131,6 +131,8 @@ full_df <- mutate(full_df,
 #Note above is integer division where 14 is number of weeks per season plus 1 so that week 13 is put in the first season (similar with week 52)
 # The + 1 after the integer division is so seasons go 1 - 4 instead of 0 - 3
 
+#realized also want total volumes too
+full_df <- full_df %>% mutate(total_volume = units * volume)
 ```
 
 ## Descriptive Statistics
@@ -790,9 +792,235 @@ full_df %>%
 ```
 - All companies average significantly higher volumes with promos, but only Kellogg has significantly higher average *sales*
 
+```{r}
+#similarly with ads
+#realizing might want total volumes more. added mutate to initial section at top
+# full_df <- full_df %>% mutate(total_volume = units * volume)
+full_df %>% 
+  group_by(company, ad) %>% 
+  summarize(avg_vol = mean(total_volume),
+            n = n(), sd_vol = sd(total_volume),
+            ci_vol = z * sd_vol/sqrt(n)) %>% 
+  ggplot(mapping = aes(x = company, y = avg_vol, fill = as.factor(ad))) +
+  geom_bar(stat = 'identity', position = 'dodge') +
+  geom_errorbar(aes(ymin = avg_vol - ci_vol, ymax = avg_vol + ci_vol),
+                width = 0.75, position = position_dodge(0.9))
+
+full_df %>% 
+  group_by(company, ad) %>% 
+  summarize(avg_sales = mean(total_sales),
+            n = n(), sd_sales = sd(total_sales),
+            ci_sales = z * sd_sales/sqrt(n)) %>% 
+  ggplot(mapping = aes(x = company, y = avg_sales, fill = as.factor(ad))) +
+  geom_bar(stat = 'identity', position = 'dodge') +
+  geom_errorbar(aes(ymin = avg_sales - ci_sales, ymax = avg_sales + ci_sales),
+                width = 0.75, position = position_dodge(0.9))
+
+```
+- Note ad A and B are not significantly different in volume or sales.
++ Maybe useful to combine them into ad yes/no similar to promo
+-Similar to promo, Kellogg is the only company to increase sales with ads
+++ What are they doing differently?
+
+```{r}
+#Check promo price difference for each brand
+full_df %>% 
+  group_by(brand, promo) %>% 
+  summarize(med_price = median(price),
+            n = n(), sd_price = sd(price),
+            ci_price = z * sd_price/sqrt(n)) %>% #TODO: Update CI for median
+  ggplot(mapping = aes(x = brand, y = med_price, fill = as.factor(promo))) +
+  geom_bar(stat = 'identity', position = 'dodge') +
+  geom_errorbar(aes(ymin = med_price - ci_price, ymax = med_price + ci_price),
+                width = 0.75, position = position_dodge(0.9)) +
+  coord_flip()
+
+#do similar but with delta price
+full_df %>% 
+  group_by(brand, promo) %>% 
+  summarize(med_price = median(price)) %>% 
+  spread(promo, med_price, sep = '_') %>% 
+  mutate(price_dif = promo_0 - promo_1) %>% 
+  ggplot(mapping = aes(x = reorder(brand,price_dif), y = price_dif)) +
+  geom_bar(stat = 'identity') +
+  coord_flip()
+
+full_df %>% 
+  group_by(brand, promo) %>% 
+  summarize(med_price = median(price)) %>% 
+  spread(promo, med_price, sep = '_') %>% 
+  mutate(perc_dif = promo_0 / promo_1 - 1) %>% 
+  ggplot(mapping = aes(x = reorder(brand,perc_dif), y = perc_dif)) +
+  geom_bar(stat = 'identity') +
+  coord_flip()
+
+#similar but by company
+full_df %>% 
+  group_by(company, promo) %>% 
+  summarize(med_price = median(price)) %>% 
+  spread(promo, med_price, sep = '_') %>% 
+  mutate(perc_dif = promo_0 / promo_1 - 1) %>% 
+  ggplot(mapping = aes(x = reorder(company,perc_dif), y = perc_dif)) +
+  geom_bar(stat = 'identity') +
+  coord_flip()
+
+full_df %>% 
+  group_by(flavor, company, promo) %>% 
+  summarize(med_price = median(price)) %>% 
+  spread(promo, med_price, sep = '_') %>% 
+  mutate(perc_dif = promo_0 / promo_1 - 1) %>% 
+  ggplot(mapping = aes(x = flavor, y = perc_dif, fill = company)) +
+  geom_bar(stat = 'identity', position = 'dodge') +
+  coord_flip()
+
+full_df %>% 
+  group_by(flavor, company, promo) %>% 
+  summarize(med_price = median(price)) %>% 
+  spread(promo, med_price, sep = '_') %>% 
+  mutate(price_dif = promo_0 - promo_1) %>% 
+  ggplot(mapping = aes(x = flavor, y = price_dif, fill = company)) +
+  geom_bar(stat = 'identity', position = 'dodge') +
+  coord_flip()
+```
+```{r}
+#test price difference significance
+#first filter arrays for setting up t-test data frames
+kellogg_promos <- full_df %>% filter(promo == 1, company == 'Kellogg')
+kellogg_norm   <- full_df %>% filter(promo == 0, company == 'Kellogg')
+
+gm_promos <- full_df %>% filter(promo == 1, company == 'General Mills')
+gm_norm <- full_df %>% filter(promo == 0, company == 'General Mills')
+
+#calculate promo price below mean
+#do per upc and store avgs
+# kellogg_mean_prices <- kellogg_norm %>% 
+#   group_by(UPC, store_key) %>% 
+#   summarize(avg_yrly_price = mean(price))
+# 
+# kellogg_promos <- left_join(kellogg_promos, kellogg_mean_prices, by = c('UPC', 'store_key')) %>% 
+#   mutate(price_dif = avg_yrly_price - price,
+#          perc_disc = 1 - price / avg_yrly_price) %>% 
+#   na.omit()
+# 
+# gm_mean_prices <- gm_norm %>% 
+#   group_by(UPC, store_key) %>% 
+#   summarize(avg_yrly_price = mean(price))
+# 
+# gm_promos <- left_join(gm_promos, gm_mean_prices, by = c('UPC', 'store_key')) %>% 
+#   mutate(price_dif = avg_yrly_price - price,
+#          perc_disc = 1 - price / avg_yrly_price) %>% 
+#   na.omit()
+# 
+# #quite a few zeros or negative discounts (~10%) skewing data
+# kellogg_promos_gt_0 <- kellogg_promos %>% filter(price_dif > 0)
+# gm_promos_gt_0 <- gm_promos %>% filter(price_dif > 0)
+
+t.test(gm_norm$price, kellogg_norm$price)
+
+#better comparison is normalize for volume
+t.test(gm_norm$price / gm_norm$volume, kellogg_norm$price / kellogg_norm$volume)
+
+t.test(gm_promos$price / gm_promos$volume, kellogg_promos$price / kellogg_promos$volume)
+
+#test percentage of sales from promos
+kellogg_all <- full_df %>% filter(company =='Kellogg')
+gm_all      <- full_df %>% filter(company == 'General Mills')
+
+# t.test(kellogg_all$promo * kellogg_all$total_sales / , gm_all$promo * gm_all$total_sales)
+
+# t.test(kellogg_promos_gt_0$price_dif, gm_promos_gt_0$price_dif)
+```
 # Regression analysis
 
 # Conclusions and final visualizations
 
+``` {r}
+#plot discount levels for GM vs Kellogg in competing flavors
+
+full_df %>%
+  group_by(flavor, company, promo) %>% 
+  summarize(avg_price_per_vol = mean(price / volume)) %>% 
+  ggplot(mapping = aes(x = flavor, y = avg_price_per_vol, 
+                       fill = as.factor(promo))) +    
+  geom_bar(stat = 'identity', position = 'dodge') +
+  coord_flip()
+
+#filter FRUIT because no GM brand in that flavor
+kellogg_fig_df <- full_df %>% 
+  filter(company == 'Kellogg', flavor != 'FRUIT') %>% 
+  group_by(flavor, promo) %>% 
+  summarize(avg_price_per_vol = mean(price / volume)) %>% 
+  spread(promo, avg_price_per_vol, sep = '_')
+
+#filter CINNAMON TOAST because no Kellogg brand in that flavor
+gm_fig_df <- full_df %>% 
+  filter(company == 'General Mills', flavor != 'CINNAMON TOAST') %>% 
+  group_by(flavor, promo) %>% 
+  summarize(avg_price_per_vol = mean(price / volume)) %>% 
+  spread(promo, avg_price_per_vol, sep = '_')
+
+# fig <- ggplot(kellogg_fig_df) +
+#   geom_dumbbell(mapping = aes(y = flavor, x = promo_1, xend = promo_0)) +
+#   geom_dumbbell(data = gm_fig_df, mapping = aes(y = flavor, x = promo_1, xend = promo_0), color = 'green') +
+#   position_dodge(0.7)
+
+full_df %>% 
+  filter(company != 'Post') %>% 
+  group_by(company, promo) %>% 
+  summarize(avg_price_per_vol = mean(price / volume)) %>% 
+  spread(promo, avg_price_per_vol, sep = '_') %>% 
+  ggplot() +
+   geom_dumbbell(mapping = aes(y = company, x = promo_1, xend = promo_0),
+                 colour = 'grey70',
+                 colour_x = '#385CB7',
+                 colour_xend = '#001a33',
+                 size = 1.75) +
+  my_theme
+
+full_df %>% 
+  filter(company != 'Post') %>% 
+  group_by(company, promo) %>% 
+  summarize(avg_price_per_vol = mean(price / volume)) %>% 
+  ggplot() +
+  geom_line(mapping = aes(x = promo, y = avg_price_per_vol, color = company)) +
+  scale_colour_manual(values = c('#385cb7', 'grey70'), labels = c('General Mills', 'Kellogg')) +
+  geom_point(mapping = aes(x = promo, y = avg_price_per_vol)) +
+  my_theme
+
+full_df %>% 
+  filter(company != 'Post') %>% 
+  group_by(company, promo) %>% 
+  summarize(avg_price_per_vol = mean(price / volume)) %>% 
+  spread(promo, avg_price_per_vol, sep = '_') %>% 
+  ggplot() +
+   geom_dumbbell(mapping = aes(y = company, x = c(0,0), xend = promo_0 - promo_1),
+                 colour = 'grey70',
+                 colour_x = '#385CB7',
+                 colour_xend = '#001a33',
+                 size = 1.75) +
+  geom_text(mapping = aes(x = promo_0 - promo_1, y = c(1.2, 2.2)), label = c( '+$0.94','+$0.81\n(Non-promo price)'), color = '#001a33') +
+  geom_text(mapping = aes(x = c(0,0.04), y = c(1.2, 2.2)), label = c('$3.76', '$3.51\n(Promo Price)'), color = '#385CB7') +
+  labs(title = 'General Mills average discount larger than Kellogg',
+       subtitle = 'Promo price also significantly higher*',
+       caption = '*Prices shown in price per unit volume ($/lb)') +
+  theme(panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.line.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(color = "#808080", size = 18, face = "bold"),
+        plot.subtitle = element_text(color = "#808080", size = 14, face = "plain"),
+        axis.text.x = element_blank(),
+        axis.text.y = element_text(color = "#808080", size = 12),
+        axis.title = element_text(color = "#808080", size = 11, face = "plain"),
+        legend.title = element_text(color = "#808080", size = 12, face = "plain"),
+        legend.text = element_text(color = "#808080", size = 12, face = "plain"),
+        plot.caption = element_text(color = "#808080", size = 10, face = "plain", margin = margin(t=10))
+        )
+  
+         
+```
 
 

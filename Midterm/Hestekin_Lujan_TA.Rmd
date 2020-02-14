@@ -1207,6 +1207,23 @@ gm_all      <- full_df %>% filter(company == 'General Mills')
 
 
 ## Finding #1: On average, Cheerios sales decrease with promotions
+```{r}
+# Set my theme to make visualizations consistent
+my_theme <- theme(panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.ticks.y = element_line(color = "white"),
+        axis.line.x = element_line(color = "gray"),
+        axis.ticks.x = element_line(color = "gray"),
+        plot.title = element_text(color = "#808080", size = 16, face = "bold"),
+        plot.subtitle = element_text(color = "#808080", size = 12, face = "plain"),
+        axis.text.x = element_text(color = "#808080", size = 11),
+        axis.text.y = element_text(color = "#808080", size = 11),
+        axis.title = element_text(color = "#808080", size = 11, face = "plain"),
+        legend.title = element_text(color = "#808080", size = 12, face = "plain"),
+        legend.text = element_text(color = "#808080", size = 12, face = "plain"),
+        plot.caption = element_text(color = "#808080", size = 10, face = "plain", margin = margin(t=10))
+        )
+```
 
 ``` {r}
 #plot discount levels for GM vs Kellogg in competing flavors
@@ -1300,23 +1317,7 @@ full_df %>%
 
 Based on the hypothesis tests above, we see that not every General Mills brand sees a positive impact to their sales from promotions. Lucky Charms, Cocoa Puffs, and Cinnamon Toast Crunch see positive impacts to their sales that are both practically and statistically significant. Kix sees no statistically significant impact to its average sales, while Cheerios has a large negative impact that is also statistically significant.
 
-```{r}
-# Set my theme to make visualizations consistent
-my_theme <- theme(panel.border = element_blank(),
-        panel.background = element_blank(),
-        axis.ticks.y = element_line(color = "white"),
-        axis.line.x = element_line(color = "gray"),
-        axis.ticks.x = element_line(color = "gray"),
-        plot.title = element_text(color = "#808080", size = 16, face = "bold"),
-        plot.subtitle = element_text(color = "#808080", size = 12, face = "plain"),
-        axis.text.x = element_text(color = "#808080", size = 11),
-        axis.text.y = element_text(color = "#808080", size = 11),
-        axis.title = element_text(color = "#808080", size = 11, face = "plain"),
-        legend.title = element_text(color = "#808080", size = 12, face = "plain"),
-        legend.text = element_text(color = "#808080", size = 12, face = "plain"),
-        plot.caption = element_text(color = "#808080", size = 10, face = "plain", margin = margin(t=10))
-        )
-```
+
 
 ```{r}
 # Create new object to make visualization easier

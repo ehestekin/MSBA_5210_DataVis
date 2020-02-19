@@ -1,0 +1,23 @@
+---
+title: "Patchwork Package Tutorial"
+author: 'Eric Hestekin'
+output: html_notebook
+---
+
+### Intro
+This tutorial will show the basics of the patchwork package.  A simple and powerful alternative to the familiar grid.arrange() style plot organization.  First install the package if it isn't already installed.
+
+```{r}
+#this syntax will check if package is already downloaded to save some time
+if(!('patchwork' %in% installed.packages())){
+  install.packages('patchwork')
+}
+```
+
+
+We are going to use the King County housing data for this example.
+
+```{r}
+housing_data <- read.csv('qp1_data.csv')
+```
+

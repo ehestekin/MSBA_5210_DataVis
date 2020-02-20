@@ -1,23 +1,109 @@
 ---
 title: "Patchwork Package Tutorial"
-author: 'Eric Hestekin'
-output: html_notebook
+author: "Eric Hestekin"
+output:
+  html_document:
+    df_print: paged
 ---
 
 ### Intro
 This tutorial will show the basics of the patchwork package.  A simple and powerful alternative to the familiar grid.arrange() style plot organization.  First install the package if it isn't already installed.
 
-```{r}
+```{r message = FALSE, warning = FALSE}
 #this syntax will check if package is already downloaded to save some time
 if(!('patchwork' %in% installed.packages())){
   install.packages('patchwork')
 }
+
+#tidyverse for ggplot
+library(tidyverse)
+library(patchwork)
+library(gridExtra)
 ```
 
 
 We are going to use the King County housing data for this example.
 
 ```{r}
-housing_data <- read.csv('qp1_data.csv')
+house_data <- read.csv('qp1_data.csv')
 ```
 
+Instead of using grid.arrange() to group the plots:
+
+```{r}
+grid.arrange(
+#price distro
+ggplot(house_data, mapping = aes(x = price)) +
+ geom_histogram(binwidth = 50000), 
+  
+# house with view distro
+ggplot(house_data, mapping = aes(x = view)) +
+  geom_histogram(binwidth = 1),
+
+ncol = 1
+)
+```
+
+You first store the plot objects:
+
+```{r}
+#price distro
+p1 <- ggplot(house_data, mapping = aes(x = price)) +
+ geom_histogram(binwidth = 50000)
+  
+# house with view distro
+p2 <- ggplot(house_data, mapping = aes(x = view)) +
+  geom_histogram(binwidth = 1)
+```
+
++ Note this does not display the plot
++ Simply type the object name `p1` or `p2` in the console to display it
+
+Instead of using grid.arrange(), we can now `+` or `|` to arrange plots horizontally, and `/` to arrange vertically:
+
+```{r}
+p1 + p2
+
+p1 / p2 
+
+p1 | p2
+```
+
+Let's add a third plot and arrange a few different ways
+
+```{r}
+p3 <- ggplot(house_data, mapping = aes(sqft_living, price)) +
+  geom_point() +
+  geom_smooth(method = 'lm')
+
+p1 / p2 / p3
+
+(p1 / p2) | p3
+
+(p1 | p2) / p3
+```
+
+A nice thing about storing plot objects is you can go back and add to them
+
+```{r}
+p1 <- p1 + labs(title = 'Price Distribution') + theme_classic()
+
+p2 <- p2 + labs(title = 'View rating distribution') + theme_dark()
+
+p3 <- p3 + geom_smooth(method = 'loess', color = '#996666') + theme_minimal()
+
+(p1 / p2) | p3
+```
+
+Another cool thing *Patchwork*`* allows is adding text or tables using 'Grobs' (graphical objects)
++ Table grobs are part of the `gridExtra` package
++ Text grobs are part of the `grid` package
+
+```{r}
+p3 + tableGrob(summary(house_data[,c('price', 'sqft_living')]))
+
+p2 <- p2 + theme_light()
+p2 + grid::textGrob('Looks like most houses have no view')
+```
+
+[For more advanced layouts and more tutorials visit this website](https://patchwork.data-imaginist.com/articles/guides/layout.html)

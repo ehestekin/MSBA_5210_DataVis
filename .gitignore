@@ -40,4 +40,5 @@ vignettes/*.pdf
 
 # Data files and notes
 *.csv
+*.tsv
 **/Notes

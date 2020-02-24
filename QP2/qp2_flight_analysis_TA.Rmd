@@ -1,0 +1,117 @@
+---
+title: "Flight Data Analysis"
+author: "Eric Hestekin"
+date: "2/27/2020"
+output: 
+  html_document:
+    number_sections: yes
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+---
+
+Repo:  https://github.com/ehestekin/MSBA_5210_DataVis
+
+``` {r echo = FALSE}
+# Course: 5210 Communicating Data
+# Purpose: General Mills Cereal Sales Analysis
+# Date: 2/13/20
+# Author: Eric Hestekin, Schyuler Lujan
+# Repo:  https://github.com/ehestekin/MSBA_5210_DataVis
+```
+
+``` {r echo = FALSE, include = FALSE}
+# Clear environment of variables and functions
+rm(list = ls(all = TRUE)) 
+# Clear environmet of packages
+if(is.null(sessionInfo()$otherPkgs) == FALSE)lapply(paste("package:", names(sessionInfo()$otherPkgs), sep=""), detach, character.only = TRUE, unload = TRUE)
+```
+
+``` {r setup, include = FALSE, warning = FALSE}
+# Load Library
+library(tidyverse)
+library(patchwork)
+library(scales)
+```
+
+
+# Intro
+
+Data source :  [US domestic flights from 1990 to 2009, US Census Bureau](http://academictorrents.com/details/a2ccf94bbb4af222bf8e69dad60a68a29f310d9a)
+
+```{r, warning = FALSE}
+#Load Data TSV
+#no column headers so set array of names
+col_labels = c('origin_code',
+               'dest_code',
+               'origin_city',
+               'dest_city',
+               'passengers',
+               'seats',
+               'num_flights',
+               'distance',
+               'year_month',
+               'origin_pop',
+               'dest_pop')
+
+flights_df <- read_tsv('flight_edges.tsv',col_names = col_labels)
+```
+
+Interested in looking at 
++ passenger volume
++ percent capacity
++ regional trends
++ total flights
+
+# Basic EDA
+
+## First look at data
+
+```{r}
+head(flights_df)
+
+summary(flights_df)
+```
+
+## Tidy
+
+```{r}
+#separate month_year
+#first 4 chars are year, convert from string to num
+flights_df <- flights_df %>% 
+  separate(year_month, into = c('year','month'), sep = 4, convert = TRUE) 
+
+#add percentage of seats filled for each flight
+#and remove rows where seats are zero (no flight data)
+# and also remove flights where seat/flight < 4 (non commercial flight)
+com_flights_df <- flights_df %>%
+  mutate(seat_fill_perc = (passengers/seats) * 100) %>% 
+  filter(seats != 0) %>% 
+  filter(seats/num_flights > 4)
+
+#also throw out seat filled percentages > 100
+#this shouldn't be possible so don't trust data point
+com_flights_df <- filter(com_flights_df, seat_fill_perc <= 100)
+
+#get summary now with tidy commercial flights data set
+summary(com_flights_df)
+```
+
+*Notes*
++ Would be useful to look at averages for passengers and seats on a single flight
++ Interesting distribution of distances
+ + + Looks like many short routes (median << mean)
++ Population skewed towards very large cities (due to more flight routes?)
++ Fairly symmetrical seat filled percentage
+
+## Look at year to year trends
+
+```{r}
+flights_df %>% 
+  group_by(year) %>% 
+  summarise()
+```
+
+
+
+

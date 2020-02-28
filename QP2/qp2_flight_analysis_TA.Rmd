@@ -107,11 +107,309 @@ summary(com_flights_df)
 ## Look at year to year trends
 
 ```{r}
-flights_df %>% 
+com_flights_df %>% 
   group_by(year) %>% 
-  summarise()
+  summarise(avg_num_flights = mean(num_flights)) %>% 
+  ggplot(mapping = aes(x = year, y = avg_num_flights)) +
+  geom_line() +
+  geom_point()
+
+com_flights_df %>% 
+  group_by(year) %>% 
+  summarise(avg_seat_fill_perc = mean(seat_fill_perc)) %>% 
+  ggplot(mapping = aes(x = year, y = avg_seat_fill_perc)) +
+  geom_line() +
+  geom_point()
+
+com_flights_df %>% 
+  group_by(year) %>% 
+  summarise(avg_passenger_vol = mean(passengers)) %>% 
+  ggplot(mapping = aes(x = year, y = avg_passenger_vol)) +
+  geom_line() +
+  geom_point()
+
+com_flights_df %>% 
+  group_by(year) %>% 
+  summarise(tot_passenger_vol = sum(passengers)) %>% 
+  ggplot(mapping = aes(x = year, y = tot_passenger_vol)) +
+  geom_line() +
+  geom_point()
+```
+
++ Drop in passenger volumes from 2007 - 2009
++ Steady increase in percentage of seats filled
+
+
+## Look at individual routes
+
+```{r}
+route_data <- com_flights_df %>% 
+  group_by(origin_city, dest_city, year) %>% 
+  summarise(total_flights = sum(num_flights),
+            total_passengers = sum(passengers),
+            total_seats = sum(seats),
+            avg_seat_fill_perc = mean(total_passengers / total_seats) * 100)
+
+#lets look at 5 most popular routes from last year and see how it has trended over the previous 10 years
+#only look at routes with more than a flight every other day
+route_data_2009 <- route_data %>% filter(year == 2009, total_flights > 365/2)
+
+#look at 10 most passenger routes
+head(route_data_2009 %>% arrange(desc(total_passengers)), 10)
+#and most and least filled
+head(route_data_2009 %>% arrange(desc(avg_seat_fill_perc)), 10)
+head(route_data_2009 %>% arrange(avg_seat_fill_perc), 10)
+
+
+```
+
+```{r}
+best_filled_routes_2009 <- route_data_2009 %>%
+  arrange(desc(avg_seat_fill_perc)) %>% 
+  select(origin_city,dest_city)
+
+#had a hard time subsetting first x rows with pipe and filter/slice
+#easy indexing here
+top10_filled_routes_2009 <- best_filled_routes_2009[1:10,]
+
+#similar with most popular
+most_pop_routes_2009 <- route_data_2009 %>% 
+  arrange(desc(total_passengers)) %>% 
+  select(origin_city,dest_city)
+
+top10_pop_routes_2009 <- most_pop_routes_2009[1:10,]
+```
+
+Plot the above popular and most filled routes over previous five years
+
+```{r}
+com_flights_df %>% 
+  filter(origin_city %in% top10_filled_routes_2009$origin_city &
+           dest_city %in% top10_filled_routes_2009$dest_city) %>% 
+  group_by(origin_city,dest_city,year) %>% 
+  summarize(avg_seat_fill_perc = 
+              mean(sum(passengers) / sum(seats)) * 100) %>% 
+  ggplot(mapping = aes(x = year, y = avg_seat_fill_perc, color = origin_city)) +
+  geom_point()
+
+#plot is too busy and having trouble filtering routes liked i'd like
+#manually choose origin/dest pairs
+com_flights_df %>% 
+  filter(origin_city == 'Nashville, TN' &
+           dest_city == 'Seattle, WA') %>% 
+  group_by(origin_city,dest_city,year) %>% 
+  summarize(avg_seat_fill_perc = 
+              mean(sum(passengers) / sum(seats)) * 100) %>% 
+  ggplot(mapping = aes(x = year, y = avg_seat_fill_perc, color = origin_city)) +
+  geom_point()
 ```
 
 
+## Look at city/population relations
 
+```{r}
+com_flights_by_city <- com_flights_df %>% 
+  group_by(origin_code, year) %>% 
+  summarize(tot_passenger_departs = sum(passengers),
+            origin_pop = mean(origin_pop), #still want origin pop data.  mean should just return the pop
+            avg_seat_fill = sum(passengers)/sum(seats) * 100,
+            pass_pop_ratio = tot_passenger_departs / origin_pop) %>% 
+  left_join(distinct(select(com_flights_df, origin_code, origin_city)), by = 'origin_code')
+
+#limit to cities with significant departures (>100 passengers daily)
+com_flights_by_city <- com_flights_by_city %>% filter(tot_passenger_departs > 36500)
+
+com_flights_by_city_2009 <- com_flights_by_city %>% filter(year == 2009)
+
+summary(com_flights_by_city)
+```
+
+# Plots
+
+```{r}
+pop_trend_data <- com_flights_df %>% 
+  group_by(year) %>% 
+  summarise(tot_passenger_vol = sum(passengers))
+
+pop_trend_plot <- ggplot(pop_trend_data, mapping = aes(x = year, y = tot_passenger_vol/1e6)) +
+  geom_line(color = 'grey') +
+  geom_line(filter(pop_trend_data, year > 2006), 
+            mapping = aes(x = year, y = tot_passenger_vol/1e6),
+            size = 1.5, 
+            color = '#750000')
+
+pop_trend_plot <- pop_trend_plot + 
+  geom_point(data = filter(pop_trend_data, year == 2009), 
+             mapping = aes(x = year, y = tot_passenger_vol/1e6), 
+             fill = '#344182', shape = 25, size = 3) +
+  geom_text(aes(x = 2010, y = tot_passenger_vol[year == 2009]/1e6 - 10), label = '526.3M', color = '#344182' )
+
+(pop_trend_data$tot_passenger_vol[20] - pop_trend_data$tot_passenger_vol[18]) / 
+  pop_trend_data$tot_passenger_vol[18] * 100
+
+pop_trend_plot + theme_classic() +
+  theme(axis.line.y = element_blank(),
+        axis.line.x = element_blank(),
+        axis.title.x  = element_blank(),
+        plot.title = element_text(color = "#808080",
+                                  size = 16, face = "bold"),
+        plot.subtitle = element_text(color = "#808080", 
+                                     size = 12, face = "plain"),
+        axis.text.x = element_text(color = "#808080", size = 11),
+        axis.text.y = element_text(color = "#808080", size = 11),
+        axis.title = element_text(color = "#808080", size = 11, face = "plain"),
+        legend.title = element_text(color = "#808080", size = 12, face = "plain"),
+        legend.text = element_text(color = "#808080", size = 12, face = "plain"),
+        plot.caption = element_text(color = "#808080", size = 10, face = "plain", margin = margin(t=10))
+        ) +
+  scale_x_continuous(breaks = seq(1990,2010, by = 6)) +
+  labs(title = 'Total passenger volume is falling',
+       subtitle = expression(paste('Down ',
+                                   italic(bold('9.1%')),
+                                   ' from 2007 peak')),
+       y = 'Millions of Passengers')
+
+
+```
+
+
+```{r}
+filled_trend_data <- com_flights_df %>% 
+  group_by(year) %>% 
+  summarise(avg_seat_fill_perc = mean(seat_fill_perc))
+
+filled_trend_plot <- ggplot(filled_trend_data, 
+                            mapping = aes(x = year,
+                                          y = avg_seat_fill_perc/100)) +
+  geom_line(color = 'grey') +
+  geom_line(filter(filled_trend_data, year > 2006), 
+            mapping = aes(x = year, y = avg_seat_fill_perc/100),
+            size = 1.5, 
+            color = '#344182')
+
+filled_trend_plot <- filled_trend_plot + 
+  geom_point(data = filter(filled_trend_data, year == 2009), 
+             mapping = aes(x = year, y = avg_seat_fill_perc/100), 
+             fill = '#344182', shape = 25, size = 3) +
+  geom_text(aes(x = 2010, y = avg_seat_fill_perc[year == 2009]/100 - 0.01), label = '71%', color = '#344182' )
+
+
+filled_trend_plot + theme_classic() +
+  theme(axis.line.y = element_blank(),
+        axis.line.x = element_blank(),
+        axis.title  = element_blank(),
+        plot.title = element_text(color = "#808080",
+                                  size = 16, face = "bold"),
+        plot.subtitle = element_text(color = "#808080", 
+                                     size = 12, face = "plain"),
+        axis.text.x = element_text(color = "#808080", size = 11),
+        axis.text.y = element_text(color = "#808080", size = 11),
+        legend.title = element_text(color = "#808080", size = 12, face = "plain"),
+        legend.text = element_text(color = "#808080", size = 12, face = "plain"),
+        plot.caption = element_text(color = "#808080", size = 10, face = "plain", margin = margin(t=10))
+        ) +
+  scale_x_continuous(breaks = seq(1990,2010, by = 6)) +
+  scale_y_continuous(labels = percent_format()) +
+  labs(title = 'However, percent of seats filled has gone up',
+       subtitle = 'Up 1 percentage point from 2007 total passenger peak')
+```
+
+```{r}
+com_flights_by_city_2009 %>% 
+  arrange(desc(tot_passenger_departs)) %>% 
+  filter(tot_passenger_departs > 16500000) %>% 
+  select(origin_code, tot_passenger_departs, origin_city) %>%
+  ggplot(mapping = aes(x = origin_code, y = tot_passenger_departs)) +
+  geom_bar(stat = 'identity') +
+  coord_flip()
+```
+
+```{r}
+com_flights_by_city_2009 %>% 
+  arrange(desc(tot_passenger_departs)) %>% 
+  filter(tot_passenger_departs > 13350000) %>% 
+  select(origin_code, origin_city, tot_passenger_departs) %>%
+  mutate(tot_passenger_departs = tot_passenger_departs / 1e6) %>% 
+  knitr::kable(col.names = c('Airport Code',
+                             'City',
+                             'Passengers (Millions)'),
+               align = 'c',
+               digits = 2) %>% 
+  kableExtra::row_spec(1)
+```
+
+```{r}
+com_flights_by_city_2009 %>% 
+  arrange(desc(avg_seat_fill)) %>% 
+  filter(tot_passenger_departs > 1e6,
+         avg_seat_fill > 79.475) %>% 
+  select(origin_code, origin_city, avg_seat_fill) %>%
+  knitr::kable(col.names = c('Airport Code',
+                             'City',
+                             'Percent Seats Filled'),
+               align = 'c',
+               digits = 2) %>% 
+  kableExtra::row_spec(8, bold = T, 
+                       color = '#808080', background = '#344182')
+```
+
+```{r}
+route_data_2009 %>% 
+  arrange(desc(avg_seat_fill_perc)) %>% 
+  filter(avg_seat_fill_perc > 94.4) %>% 
+  select(origin_city, dest_city, avg_seat_fill_perc) %>%
+  ungroup() %>% 
+  add_row(origin_city = 'All Routes',
+                     dest_city = 'Median:',
+                     avg_seat_fill_perc = 75.284) %>% 
+  knitr::kable(col.names = c('Origin',
+                             'Destination',
+                             'Percent Seats Filled'),
+               align = rep('c', 3),
+               digits = 2) %>% 
+  kableExtra::row_spec(c(1,3), bold = T, 
+                       color = '#808080', background = '#344182') %>% 
+  kableExtra::kable_styling(full_width = T) %>% 
+  kableExtra::row_spec(4, bold = T)
+
+# summary(route_data_2009)
+```
+
+```{r}
+route_data_2009 %>% 
+  arrange(desc(total_passengers)) %>% 
+  filter(total_passengers %in% 
+           #manually select rows for now had a hard time filtering properly
+           c(1501883, 1494141, 1399554, 1380928, 1352360)) %>% 
+  mutate(route = paste(origin_city, ' - ', dest_city)) %>% 
+  ggplot(mapping = aes(x = route, y = avg_seat_fill_perc/100)) +
+  geom_bar(stat = 'identity', 
+           fill = c('grey','#750000','grey','grey','grey')) +
+  geom_text(aes(x = route, y = avg_seat_fill_perc/100,
+                label = scales::percent(avg_seat_fill_perc/100,
+            accuracy = 1),
+            fontface = c('plain','plain','plain','bold','plain')), 
+            position = position_dodge(width = 0.9), 
+            hjust = 1) +
+  coord_flip() + theme_classic() +
+  theme(axis.line.y = element_blank(),
+        axis.line.x = element_blank(),
+        axis.title  = element_blank(),
+        plot.title = element_text(color = "#808080",
+                                  size = 16, face = "bold", hjust = -0.25),
+        plot.subtitle = element_text(color = "#808080", 
+                                     size = 12, face = "plain"),
+        axis.text.x = element_blank(),
+        axis.ticks = element_blank(),
+        axis.text.y = element_text(color = "#808080", size = 11,
+                                   face = c('plain','bold','plain','plain','plain')),
+        legend.title = element_text(color = "#808080", size = 12, face = "plain"),
+        legend.text = element_text(color = "#808080", size = 12, face = "plain"),
+        plot.caption = element_text(color = "#808080", size = 10, face = "plain", margin = margin(t=10))
+        ) +
+  scale_y_continuous(labels = percent_format(accuracy = 1)) +
+  labs(title = 'Houston to Dallas flights are too empty',
+       subtitle = 'Top 5 routes by passenger volume' )
+  
+```
 

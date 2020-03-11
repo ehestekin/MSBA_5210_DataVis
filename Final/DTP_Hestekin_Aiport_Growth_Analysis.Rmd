@@ -1,0 +1,62 @@
+---
+title: "Airport Growth Potential"
+author: "Eric Hestekin"
+date: "2/27/2020"
+output: 
+  html_document:
+    number_sections: yes
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+---
+
+Repo:  https://github.com/ehestekin/MSBA_5210_DataVis
+
+``` {r echo = FALSE}
+# Course: 5210 Communicating Data
+# Purpose: Final Project: Airport Growth Analysis
+# Date: 2/13/20
+# Author: Eric Hestekin, Schyuler Lujan
+# Repo:  https://github.com/ehestekin/MSBA_5210_DataVis
+```
+
+``` {r echo = FALSE, include = FALSE}
+# Clear environment of variables and functions
+rm(list = ls(all = TRUE)) 
+# Clear environmet of packages
+if(is.null(sessionInfo()$otherPkgs) == FALSE)lapply(paste("package:", names(sessionInfo()$otherPkgs), sep=""), detach, character.only = TRUE, unload = TRUE)
+```
+
+``` {r setup, include = FALSE, warning = FALSE}
+# Load Library
+library(tidyverse)
+library(scales)
+```
+
+
+# Data Load and Wrangle
+
+Data source :  [US domestic flights from 1990 to 2009, US Census Bureau](http://academictorrents.com/details/a2ccf94bbb4af222bf8e69dad60a68a29f310d9a)
+
+```{r, message = FALSE, warning = FALSE}
+#Load Data TSV
+#no column headers so set array of names
+col_labels = c('origin_code',
+               'dest_code',
+               'origin_city',
+               'dest_city',
+               'passengers',
+               'seats',
+               'num_flights',
+               'distance',
+               'year_month',
+               'origin_pop',
+               'dest_pop')
+
+#suppress colum spec message.  (Markdown code block setting doesn't work)
+flights_df <- suppressMessages(read_tsv('flight_edges.tsv',col_names = col_labels))
+```
+
+Goal is to identify airports with growth potential
++ Answer the business question "Which airports should be targets for expansion?"
++ What airport and city characteristics are good predictors of flight growth?

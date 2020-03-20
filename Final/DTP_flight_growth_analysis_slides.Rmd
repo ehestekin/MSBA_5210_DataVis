@@ -1,0 +1,255 @@
+---
+title: "USA Domestic Flights Growth Analysis"
+author: "Eric Hestekin"
+date: "3/19/2020"
+output: slidy_presentation
+---
+
+
+``` {r echo = FALSE}
+# Course: 5210 Communicating Data
+# Purpose: USA Domestic Flights Growth Analysis
+# Date: 3/19/20
+# Author: Eric Hestekin
+# Repo:  https://github.com/ehestekin/MSBA_5210_DataVis
+```
+
+``` {r echo = FALSE, include = FALSE}
+# Clear environment of variables and functions
+rm(list = ls(all = TRUE)) 
+# Clear environmet of packages
+if(is.null(sessionInfo()$otherPkgs) == FALSE)lapply(paste("package:", names(sessionInfo()$otherPkgs), sep=""), detach, character.only = TRUE, unload = TRUE)
+```
+
+``` {r setup, include = FALSE, warning = FALSE}
+# Load Library
+library(tidyverse)
+library(scales)
+library(gridExtra)
+library(inspectdf)
+library(ggrepel)
+```
+
+
+```{r, include = FALSE, warning = FALSE}
+#Load Data 
+yrly_com_flights_by_city <- read_csv('yrly_com_flights_by_city.csv')
+com_flights_df <- read_csv('com_flights_df.csv')
+```
+
+
+Recent air travel market downturn
+====================================
+
+```{r, echo = FALSE}
+pop_trend_data <- com_flights_df %>% 
+  group_by(year) %>% 
+  summarise(tot_passenger_vol = sum(passengers))
+
+pop_trend_plot <- ggplot(pop_trend_data, mapping = aes(x = year, y = tot_passenger_vol/1e6)) +
+  geom_line(color = 'grey') +
+  geom_line(filter(pop_trend_data, year > 2006), 
+            mapping = aes(x = year, y = tot_passenger_vol/1e6),
+            size = 1.5, 
+            color = '#750000')
+
+pop_trend_plot <- pop_trend_plot + 
+  geom_point(data = filter(pop_trend_data, year == 2009), 
+             mapping = aes(x = year, y = tot_passenger_vol/1e6), 
+             fill = '#344182', shape = 25, size = 3) +
+  geom_text(aes(x = 2010, y = tot_passenger_vol[year == 2009]/1e6 - 10), label = '526.3M', color = '#344182' )
+
+
+pop_trend_plot + theme_classic() +
+  theme(axis.line.y = element_blank(),
+        axis.line.x = element_blank(),
+        axis.title.x  = element_blank(),
+        plot.title = element_text(color = "#808080",
+                                  size = 16, face = "bold"),
+        plot.subtitle = element_text(color = "#808080", 
+                                     size = 12, face = "plain"),
+        axis.text.x = element_text(color = "#808080", size = 11),
+        axis.text.y = element_text(color = "#808080", size = 11),
+        axis.title = element_text(color = "#808080", size = 11, face = "plain"),
+        legend.title = element_text(color = "#808080", size = 12, face = "plain"),
+        legend.text = element_text(color = "#808080", size = 12, face = "plain"),
+        plot.caption = element_text(color = "#808080", size = 10, face = "plain", margin = margin(t=10))
+        ) +
+  scale_x_continuous(breaks = seq(2005,2010, by = 2)) +
+  labs(title = 'Total passenger volume is falling',
+       subtitle = expression(paste('Down ',
+                                   italic(bold('9.1%')),
+                                   ' from 2007 peak')),
+       y = 'Millions of Passengers')
+```
+
+ - Sharp decrease in passenger volume presents revenue challenges
+
+<font size = '3'>Source Data:  [US domestic flights from 1990 to 2009, US Census Bureau](http://academictorrents.com/details/a2ccf94bbb4af222bf8e69dad60a68a29f310d9a)</font>
+
+Despite volume drop, operating efficiency is up 
+===============================================
+
+```{r, echo = FALSE}
+filled_trend_data <- com_flights_df %>% 
+  group_by(year) %>% 
+  summarise(avg_load_factor = mean(load_factor))
+
+filled_trend_plot <- ggplot(filled_trend_data, 
+                            mapping = aes(x = year,
+                                          y = avg_load_factor/100)) +
+  geom_line(color = 'grey') +
+  geom_line(filter(filled_trend_data, year > 2006), 
+            mapping = aes(x = year, y = avg_load_factor/100),
+            size = 1.5, 
+            color = '#344182')
+
+filled_trend_plot <- filled_trend_plot + 
+  geom_point(data = filter(filled_trend_data, year == 2009), 
+             mapping = aes(x = year, y = avg_load_factor/100), 
+             fill = '#344182', shape = 25, size = 3) +
+  geom_text(aes(x = 2010, y = avg_load_factor[year == 2009]/100 - 0.01), label = '71%', color = '#344182' )
+
+
+filled_trend_plot + theme_classic() +
+  theme(axis.line.y = element_blank(),
+        axis.line.x = element_blank(),
+        axis.title  = element_blank(),
+        plot.title = element_text(color = "#808080",
+                                  size = 16, face = "bold"),
+        plot.subtitle = element_text(color = "#808080", 
+                                     size = 12, face = "plain"),
+        axis.text.x = element_text(color = "#808080", size = 11),
+        axis.text.y = element_text(color = "#808080", size = 11),
+        legend.title = element_text(color = "#808080", size = 12, face = "plain"),
+        legend.text = element_text(color = "#808080", size = 12, face = "plain"),
+        plot.caption = element_text(color = "#808080", size = 10, face = "plain", margin = margin(t=10))
+        ) +
+  scale_x_continuous(breaks = seq(2005,2010, by = 2)) +
+  scale_y_continuous(labels = percent_format()) +
+  labs(title = 'However, percent of seats filled has gone up',
+       subtitle = 'Up 1 percentage point from 2007 total passenger peak')
+```
+
+- With fewer passengers it will be important to manage number of seats offered
+- Empty seats eat up profit
+
+Growing cities are a good bet for successful expansion
+======================================================
+
+```{r, echo = FALSE}
+yrly_com_flights_by_city %>% 
+  ggplot(mapping = aes(x = total_pop_growth/1000000, y = total_passengers/1000000)) +
+  geom_point(color = 'grey') + 
+  geom_smooth(color = '#344182', method = 'lm', se = FALSE) +
+  theme_classic() +
+  theme(axis.line.y = element_blank(),
+        axis.line.x = element_blank(),
+        axis.title  = element_text(color = "#808080", size = 11, face = "bold"),
+        plot.title = element_text(color = "#808080",
+                                  size = 16, face = "bold"),
+        plot.subtitle = element_text(color = "#808080", 
+                                     size = 12, face = "plain"),
+        axis.text.x = element_text(color = "#808080", size = 11),
+        axis.text.y = element_text(color = "#808080", size = 11),
+        legend.title = element_text(color = "#808080", size = 12, face = "plain"),
+        legend.text = element_text(color = "#808080", size = 12, face = "plain"),
+        plot.caption = element_text(color = "#808080", size = 10, face = "plain", margin = margin(t=10))
+        ) +
+  xlab('Population growth') +
+  ylab('Total passengers') +
+  labs(title = 'Population growth correlates strongly with passenger growth',
+       subtitle = 'Numbers for previous five years (in millions)\nDallas, TX fastest growing city (by far)') +
+  geom_label_repel(filter(yrly_com_flights_by_city, origin_city == 'Dallas, TX'), 
+                   mapping = aes(x = total_pop_growth/1000000, y = total_passengers/1000000, label = origin_city),
+                   segment.color = '#344182', min.segment.length = 0, nudge_y = -15.5, label.size = NA, color = '#344182')
+```
+
++ Despite massive population growth in previous five years, Dallas did not have growth in passenger volume
+
+High load factor locations provide growth opportunity too
+=====================================================================================
+```{r, echo = FALSE}
+yrly_com_flights_by_city %>% 
+  filter(percent_pop_growth > 0) %>% 
+  filter(total_load_factor > 0.65) %>% 
+  ggplot(mapping = aes(x = total_load_factor, y = percent_pop_growth/100)) +
+  geom_point(color = 'grey') +
+  theme_classic() +
+  theme(axis.line.y = element_blank(),
+        axis.line.x = element_blank(),
+        axis.title  = element_text(color = "#808080", size = 11, face = "bold"),
+        plot.title = element_text(color = "#808080",
+                                  size = 16, face = "bold"),
+        plot.subtitle = element_text(color = "#808080", 
+                                     size = 12, face = "plain"),
+        axis.text.x = element_text(color = "#808080", size = 11),
+        axis.text.y = element_text(color = "#808080", size = 11),
+        legend.title = element_text(color = "#808080", size = 12, face = "plain"),
+        legend.text = element_text(color = "#808080", size = 12, face = "plain"),
+        plot.caption = element_text(color = "#808080", size = 10, face = "plain", margin = margin(t=10))
+        ) +
+  scale_x_continuous(labels = percent_format()) +
+  scale_y_continuous(labels = percent_format()) +
+  xlab('Load factor') +
+  ylab('Population growth') +
+  labs(title = 'Seattle and Miami are also prime candidates for expansion',
+       subtitle = 'High load factor, above average population growth') +
+  geom_label_repel(filter(yrly_com_flights_by_city, origin_city %in% c('Charlotte, NC', 'Seattle, WA', 'Dallas, TX', 'Miami, FL')), 
+                   mapping = aes(x = total_load_factor, y = percent_pop_growth/100, label = origin_city),
+                   segment.color = '#344182', min.segment.length = 0, nudge_y = 0.05, nudge_x = 0.05, label.size = NA, color = '#344182')
+```
+
++ Above average load factor implies more seats could be offered profitably.
++ Combined with positive population growth makes these cities the best bet
+
+Charlotte should be priority #1 for further growth
+==================================================
+```{r, echo = FALSE}
+# all cities with positve passenger growth and positive load factor growth
+yrly_com_flights_by_city %>% 
+  filter(total_passenger_growth > 0, avg_load_factor_growth > 0) %>% 
+  arrange(desc(total_passenger_growth)) %>% 
+  ggplot(mapping = aes(x = avg_load_factor_growth/100, y = total_passenger_growth/1e6, label = origin_city)) + 
+  geom_point(color = 'grey') + 
+  theme_classic() +
+  theme(axis.line.y = element_blank(),
+        axis.line.x = element_blank(),
+        axis.title  = element_text(color = "#808080", size = 11, face = "bold"),
+        plot.title = element_text(color = "#808080",
+                                  size = 16, face = "bold"),
+        plot.subtitle = element_text(color = "#808080", 
+                                     size = 12, face = "plain"),
+        axis.text.x = element_text(color = "#808080", size = 11),
+        axis.text.y = element_text(color = "#808080", size = 11),
+        legend.title = element_text(color = "#808080", size = 12, face = "plain"),
+        legend.text = element_text(color = "#808080", size = 12, face = "plain"),
+        plot.caption = element_text(color = "#808080", size = 10, face = "plain", margin = margin(t=10))
+        ) +
+  scale_x_continuous(labels = percent_format()) +
+  xlab('Annualized load factor growth') +
+  ylab('Passenger growth (in millions)') +
+  labs(title = 'Charlotte is a major positive growth outlier',
+       subtitle = 'Both load factor growth and passenger growth are strong\n(only positve passenger growth cities shown) ') +
+  geom_label_repel(filter(yrly_com_flights_by_city, origin_city %in% c('Charlotte, NC', 'Seattle, WA', 'Miami, FL')), 
+                   mapping = aes(x = avg_load_factor_growth/100, y = total_passenger_growth/1e6, label = origin_city),
+                   segment.color = '#344182', min.segment.length = 0, nudge_y = -.15, label.size = NA, color = '#344182')
+
+```
+
+Conclusion
+==============
+
+- Decreasing passenger volumes make efficiency improvements critical
+- Dallas, TX is the country's fastest growing city by population, but has not yet had more seats offered to take advantage of larger population
+- Seattle and Miami are good candidates for growth due to:
+    - Growing population
+    - Increasing passenger numbers despite wider industry downturn
+    - High load factor lowers risk
+- Charlotte has the most impressive recent growth and should remain a priority for further growth
+
+<font size = '3'>
+For comments or questions:  
+Eric Hestekin  
+ehestekin@seattleu.edu
+</font>

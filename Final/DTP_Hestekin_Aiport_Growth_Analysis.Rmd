@@ -31,6 +31,9 @@ if(is.null(sessionInfo()$otherPkgs) == FALSE)lapply(paste("package:", names(sess
 # Load Library
 library(tidyverse)
 library(scales)
+library(gridExtra)
+library(inspectdf)
+library(ggrepel)
 ```
 
 
@@ -81,13 +84,17 @@ flights_df <- flights_df %>%
 #and remove rows where seats are zero (no flight data)
 # and also remove flights where seat/flight < 4 (non commercial flight)
 com_flights_df <- flights_df %>%
-  mutate(seat_fill_perc = (passengers/seats) * 100) %>% 
-  filter(seats != 0) %>% 
-  filter(seats/num_flights > 4)
+  mutate(load_factor = (passengers/seats) * 100) %>% 
+  filter(seats != 0) %>%
+  filter(passengers != 0) %>% 
+  filter(seats/num_flights > 4) %>% 
+  #focus on routes offering >500 seats/wk (2150/month)
+  #way too many routes with a very small number of people flying
+  filter(seats > 2150)
 
 #also throw out seat filled percentages > 100
 #this shouldn't be possible so don't trust data point
-com_flights_df <- filter(com_flights_df, seat_fill_perc <= 100)
+com_flights_df <- filter(com_flights_df, load_factor <= 100)
 
 #focusing on current growth prospects so only keep previous 5 years of data
 com_flights_df <- com_flights_df %>% 
@@ -100,8 +107,43 @@ pop_increases <- com_flights_df %>%
   arrange(desc(year), .by_group = TRUE) %>% 
   mutate(pop_increase = avg_pop - lead(avg_pop))
 
+#calculate route seats flown and offered increase year to year
+flight_increases <- com_flights_df %>% 
+  group_by(origin_code, dest_code, year) %>% 
+  summarize(yrly_passenger = sum(passengers), yrly_seats = sum(seats)) %>% 
+  arrange(desc(year), .by_group = TRUE) %>% 
+  mutate(pass_growth = yrly_passenger - lead(yrly_passenger), seat_growth = yrly_seats - lead(yrly_seats), 
+         yrly_load_factor = yrly_passenger / yrly_seats * 100, load_factor_growth = yrly_load_factor - lead(yrly_load_factor))
+
+#put yrly data together
+#first add full city names
+#then add population numbers
+yrly_com_flights_df <- inner_join(flight_increases, distinct(select(com_flights_df, origin_code, origin_city)), by = 'origin_code') %>% 
+  inner_join(distinct(select(com_flights_df, dest_code, dest_city)), by = 'dest_code') %>% 
+  inner_join(pop_increases, by = c('year', 'origin_city')) %>%
+  #rename columns for origin city so able to add destination population data
+  rename(origin_pop = avg_pop, origin_pop_increase = pop_increase) %>% 
+  inner_join(rename(pop_increases, dest_city = origin_city, dest_pop = avg_pop, dest_pop_increase = pop_increase), by = c('year', 'dest_city')) %>% 
+  #distance got dropped during grouping
+  inner_join(distinct(select(com_flights_df, origin_code, dest_code, distance)), by = c('origin_code', 'dest_code'))
+
+#noticed there are duplicates of some rows (everything is same except distance is one mile different)
+yrly_com_flights_df_no_dup_test <-  yrly_com_flights_df %>% distinct(origin_code, dest_code, year, .keep_all = TRUE)
+
+#noticed the duplicates with the CLT/ABE route in the Individual Route and City Analysis section
+#check dupes were removed
+yrly_com_flights_df_no_dup_test %>% filter(origin_code == 'CLT')
+
+#looks like it worked so save df
+yrly_com_flights_df <- yrly_com_flights_df_no_dup_test
+rm(yrly_com_flights_df_no_dup_test)
+  
+# Save df for use in PowerBI Dash
+write_csv(yrly_com_flights_df, path = 'yrly_com_flights_df.csv')
+
+
 #get summary now with tidy commercial flights data set
-summary(com_flights_df)
+summary(yrly_com_flights_df)
 ```
 
 *Notes*
@@ -110,8 +152,28 @@ summary(com_flights_df)
 + Interesting distribution of distances
     + Looks like many short routes (median << mean)
 + Population skewed towards very large cities (due to more flight routes?)
-+ Fairly symmetrical seat filled percentage
++ Fairly symmetrical load factor
++ NAs result from not having previous data
+    + New route or first year in data (2005)
+    
++ Populations are growing but distribution is skewed (mean>>median)
 
+**Assuming very minimal net one-way travelers so origin/destination numbers are symmetric**
++ Focus on departing flights (origin city sorting) and assume numbers are nearly identical for arrivals
+
+```{r}
+# Quick check above assumption with Chicago (busiest airport by passenger volume, found below)
+yrly_com_flights_df %>% filter(origin_code == 'ORD') %>% 
+  group_by(year) %>% 
+  summarize(total_departs = sum(yrly_passenger)) / #divide the arrives by departs
+
+yrly_com_flights_df %>% filter(dest_code == 'ORD') %>% 
+  group_by(year) %>% 
+  summarize(total_arrives = sum(yrly_passenger))
+```
++ All years at ORD are within 0.4% of equal departs and arrivals
+
+# Graphical Analysis
 
 ## How has data changed over time covered in dataset?
 ```{r}
@@ -124,8 +186,8 @@ com_flights_df %>%
 
 com_flights_df %>% 
   group_by(year) %>% 
-  summarise(avg_seat_fill_perc = mean(seat_fill_perc)) %>% 
-  ggplot(mapping = aes(x = year, y = avg_seat_fill_perc)) +
+  summarise(avg_load_factor = mean(load_factor)) %>% 
+  ggplot(mapping = aes(x = year, y = avg_load_factor)) +
   geom_line() +
   geom_point()
 
@@ -143,4 +205,646 @@ com_flights_df %>%
   geom_line() +
   geom_point()
 ```
+
++ Drop in passenger volumes from 2007 - 2009
++ Increase in percentage of seats filled in same time period
+
+## Look at individual variables
+### Distance
+
+```{r}
+grid.arrange(
+  ggplot(data = yrly_com_flights_df, mapping = aes(x = 1, y = distance)) +
+    geom_boxplot() +
+    coord_flip(),
+  #100 mile bins for easier increments
+  ggplot(data = yrly_com_flights_df, mapping = aes(x = distance)) +
+    geom_histogram(binwidth = 100),
+  
+  ncol = 1
+)
+```
+
++ Domestic flights mostly are between 300 - 1000 miles
+
+### Load Factor
+
+```{r}
+grid.arrange(
+  ggplot(data = yrly_com_flights_df, mapping = aes(x = 1, y = yrly_load_factor)) +
+    geom_boxplot() +
+    coord_flip(),
+  
+  ggplot(data = yrly_com_flights_df, mapping = aes(x = yrly_load_factor)) +
+    geom_histogram(bins = 50),
+  
+  ncol = 1
+)
+```
+
++ Vast majority of flights are above half full
++ Half of the routes were greater than ~75% full
+
+### Passengers
+
+```{r}
+grid.arrange(
+  ggplot(data = yrly_com_flights_df, mapping = aes(x = 1, y = yrly_passenger)) +
+    geom_boxplot() +
+    coord_flip(),
+  
+  ggplot(data = yrly_com_flights_df, mapping = aes(x = yrly_passenger)) +
+    geom_histogram(bins = 50),
+  
+  ncol = 1
+)
+```
+
++ There are lots of routes with very few yearly passengers.
+    + Median >> Mean
+    
+### Load Factor and Passenger Growth (last year)
+
+```{r}
+grid.arrange(
+  ggplot(data = filter(yrly_com_flights_df, year == 2009), mapping = aes(x = 1, y = load_factor_growth)) +
+    geom_boxplot() +
+    coord_flip(),
+  
+  ggplot(data = filter(yrly_com_flights_df, year == 2009), mapping = aes(x = load_factor_growth)) +
+    geom_histogram(bins = 50),
+  
+  ncol = 1
+)
+```
+
+```{r}
+grid.arrange(
+  ggplot(data = filter(yrly_com_flights_df, year == 2009), mapping = aes(x = 1, y = pass_growth)) +
+    geom_boxplot() +
+    coord_flip(),
+  
+  ggplot(data = filter(yrly_com_flights_df, year == 2009), mapping = aes(x = pass_growth)) +
+    geom_histogram(bins = 100),
+  
+  ncol = 1
+)
+```
+
++ Growth relatively symmetrical distribution
++ Median above zero, showing overall load factor growth
++ Median below zero, showing overall negative passenger growth
++ Interested to look at the large growth routes
+
+# Individual Route and City Analysis
+
+## Top Airports
+
++ Looking at cities instead of departure airports to make analysis consistent for places with multiple airports
+
+### By Passenger Volume
+
+```{r}
+
+yrly_com_flights_df %>% group_by(origin_city) %>% 
+  summarize(total_passengers = sum(yrly_passenger)) %>% 
+  arrange(desc(total_passengers)) %>% 
+  head(10)
+```
+
+### By Load Factor
+
+```{r}
+
+yrly_com_flights_df %>% group_by(origin_city) %>% 
+  summarize(total_load_factor = sum(yrly_passenger)/ sum(yrly_seats)) %>% 
+  arrange(desc(total_load_factor)) %>% 
+  head(10)
+```
+
+### Five year passenger volume growth
+
+```{r}
+
+yrly_com_flights_df %>% group_by(origin_city) %>% 
+  summarize(total_passenger_growth = sum(pass_growth, na.rm = TRUE)) %>% 
+  arrange(desc(total_passenger_growth)) %>% 
+  head(10)
+```
+
+### Five year seat volume growth
+
+```{r}
+
+yrly_com_flights_df %>% group_by(origin_city) %>% 
+  summarize(total_seat_growth = sum(seat_growth, na.rm = TRUE)) %>% 
+  arrange(desc(total_seat_growth)) %>% 
+  head(10)
+```
+
++ Interesting Charlotte has largest passenger growth but is 3rd in seat growth
+
++ *Does that imply a large load factor increase?*
+
+```{r}
+#take closer look at Charlotte
+#EDIT:  Used this to identify duplicate ABE routes which greatly affected Charlotte numbers.  Fixed in wrangle section above
+#yrly_com_flights_df %>% filter(origin_code == 'CLT')
+
+```
+
+### Five year load factor growth
+
+```{r}
+#total five year load factor growth
+yrly_com_flights_df %>% group_by(origin_city) %>% 
+  summarize(total_load_factor_growth = sum(load_factor_growth, na.rm = TRUE)) %>% 
+  arrange(desc(total_load_factor_growth)) %>% 
+  head(10)
+
+#average growth per route
+yrly_com_flights_df %>% group_by(origin_city) %>% 
+  summarize(n = n(), avg_load_factor_growth = sum(load_factor_growth, na.rm = TRUE) / n) %>% 
+  arrange(desc(avg_load_factor_growth)) %>% 
+  head(10)
+
+#above top 10 is all very small routes (n < 33 over five years)
+#check with n > 100 (20 routes/yr)
+yrly_com_flights_df %>% group_by(origin_city) %>% 
+  summarize(n = n(), avg_load_factor_growth = sum(load_factor_growth, na.rm = TRUE) / n) %>%
+  filter(n > 100) %>% 
+  arrange(desc(avg_load_factor_growth)) %>% 
+  head(10)
+
+
+```
+
++ **As expected from passenger/seat numbers, Charlotte has highest load factor growth**
+
+## City Growth Analysis
+
+```{r}
+#total five year pop growth
+pop_increases %>% group_by(origin_city) %>% 
+  summarize(total_pop_growth = sum(pop_increase, na.rm = TRUE)) %>% 
+  arrange(desc(total_pop_growth)) 
+
+#by percentage
+pop_increases %>% group_by(origin_city) %>% 
+  summarize(min_year = min(year), percent_pop_growth = sum(pop_increase, na.rm = TRUE) / avg_pop[year == min_year] * 100) %>% 
+  arrange(desc(percent_pop_growth)) 
+```
+
++ Austin and Charlotte are in top ten for load factor growth and percent population growth
++ Total population growth and passenger growth also have cities in common
++ Dallas has by far the largest population growth
+    
++ **Correlation between city growth and airport growth?**
+
+
+# Statistics
+
+## Check correlations
+
+```{r}
+#this plot doesn't look right.  maybe not the right format of df
+# yrly_com_flights_df %>% 
+#   group_by(origin_city, year) %>% 
+#   select(yrly_passenger, yrly_seats, origin_pop, dest_pop) %>% 
+#   inspect_cor() %>% 
+#   show_plot()
+
+#try on one city
+yrly_com_flights_df %>%
+  filter(origin_city == 'Charlotte, NC') %>%
+  select(yrly_passenger, yrly_seats, origin_pop, dest_pop) %>%
+  inspect_cor() %>%
+  show_plot()
+
+```
+
++ Still not a fan of above method from week 10.  Do manual testing instead
+
+### Population and Passengers
+
+```{r}
+#First group flights by city so individual routes aren't being tested
+#combine all the above parameters into this dataset
+yrly_com_flights_by_city <- yrly_com_flights_df %>% 
+  group_by(origin_city) %>% 
+  summarize(total_passengers = sum(yrly_passenger),
+            total_seats = sum(yrly_seats),
+            total_load_factor = sum(yrly_passenger)/ sum(yrly_seats),
+            total_passenger_growth = sum(pass_growth, na.rm = TRUE),
+            passenger_growth_percentage = total_passenger_growth / total_passengers * 100,
+            total_seat_growth = sum(seat_growth, na.rm = TRUE),
+            total_load_factor_growth = sum(load_factor_growth, na.rm = TRUE),
+            n = n(), 
+            avg_load_factor_growth = sum(load_factor_growth, na.rm = TRUE) / n)
+
+#add pop data and join
+pop_increases_by_city <- pop_increases %>% 
+  group_by(origin_city) %>% 
+  summarize(total_pop_growth = sum(pop_increase, na.rm = TRUE),
+            min_year = min(year), 
+            percent_pop_growth = sum(pop_increase, na.rm = TRUE) / avg_pop[year == min_year] * 100,
+            avg_pop = mean(avg_pop))#keep population in df. 5yr avg in this case
+
+#join
+yrly_com_flights_by_city <- inner_join(yrly_com_flights_by_city, pop_increases_by_city, by = 'origin_city') %>% 
+  select(-min_year) %>% 
+  filter(n > 50) # also filter out very small cities (less than 10 routes/yr)
+
+#save for potential use on dash
+write_csv(yrly_com_flights_by_city, path = 'yrly_com_flights_by_city.csv')
+            
+```
+
+
+```{r}
+cor.test(yrly_com_flights_by_city$total_passengers, yrly_com_flights_by_city$avg_pop,
+         method = 'pearson')
+```
+
+```{r, warning = FALSE}
+#test inspect_cor again with grouped df
+yrly_com_flights_by_city %>% 
+  inspect_cor() %>% 
+  show_plot()
+
+#narrow down for easier reading
+yrly_com_flights_by_city %>% 
+  inspect_cor(with_col = c('total_pop_growth', 'percent_pop_growth')) %>% 
+  show_plot()
+
+```
+
++ High correlation between total population growth and total passengers
++ Not quite as high but still significant correlation between population growth and load factor growth
++ Interesting negative correlation between population growth and seat growth
+
+**Want to identify cities with:**
+- Population growth (correlated to passenger and load factor growth)
+- High load factors (room for more seats as higher percentage is filled)
+
+
+## Test significance of top cities from rankings above
+
+```{r}
+z <- qnorm(0.975)
+
+yrly_com_flights_df %>% group_by(origin_city) %>% 
+  summarize(n = n(), 
+            avg_load_factor_growth = sum(load_factor_growth, na.rm = TRUE) / n,
+            sd = sd(load_factor_growth , na.rm = TRUE) / n,
+            ci = z*sd / sqrt(n)) %>%
+  filter(n > 100) %>% 
+  arrange(desc(avg_load_factor_growth)) %>% 
+  head(10) %>% 
+  ggplot(mapping = aes(x = reorder(origin_city, avg_load_factor_growth), y = avg_load_factor_growth)) +
+  geom_bar(stat = 'identity') +
+  geom_errorbar(aes(ymin = avg_load_factor_growth - ci, ymax = avg_load_factor_growth + ci)) +
+  coord_flip()
+```
+
+
+```{r}
+z <- qnorm(0.975)
+
+yrly_com_flights_df %>% group_by(origin_city) %>% 
+  summarize(n = n(), 
+            total_load_factor_growth = sum(load_factor_growth, na.rm = TRUE) ,
+            sd = sd(load_factor_growth, na.rm = TRUE),
+            ci = z*sd / sqrt(n)) %>%
+  filter(n > 100) %>% 
+  arrange(desc(total_load_factor_growth)) %>% 
+  head(10) %>% 
+  ggplot(mapping = aes(x = reorder(origin_city, total_load_factor_growth), y = total_load_factor_growth)) +
+  geom_bar(stat = 'identity') +
+  geom_errorbar(aes(ymin = total_load_factor_growth - ci, ymax = total_load_factor_growth + ci)) +
+  coord_flip()
+```
+
+Charlotte had significantly higher load factor growth than other cities
+
+```{r}
+pop_increases %>% group_by(origin_city) %>% 
+  summarize(min_year = min(year), percent_pop_growth = sum(pop_increase, na.rm = TRUE) / avg_pop[year == min_year] * 100) %>% 
+  arrange(desc(percent_pop_growth)) %>% 
+  head(10) %>% 
+  ggplot(mapping = aes(x = reorder(origin_city, percent_pop_growth), y = percent_pop_growth)) +
+  geom_bar(stat = 'identity') +
+  coord_flip()
+
+```
+
+## Look at plots of correlated vars
+
+```{r}
+#all points to show trend
+yrly_com_flights_by_city %>% 
+  ggplot(mapping = aes(x = total_pop_growth, y = total_passengers, label = origin_city)) +
+  geom_point() 
+
+#top 20 by poulation growth
+yrly_com_flights_by_city %>% 
+  arrange(desc(total_pop_growth)) %>% 
+  head(20) %>% 
+  ggplot(mapping = aes(x = total_pop_growth, y = total_passengers, label = origin_city)) +
+  geom_point() +
+  geom_label_repel()
+
+yrly_com_flights_by_city %>% 
+  arrange(desc(total_pop_growth)) %>% 
+  head(20) %>% 
+  ggplot(mapping = aes(x = total_pop_growth, y = total_seat_growth, label = origin_city)) +
+  geom_point() +
+  geom_label_repel()
+```
+
+```{r}
+yrly_com_flights_by_city %>% 
+  arrange(desc(percent_pop_growth)) %>% 
+  head(20) %>% 
+  ggplot(mapping = aes(x = percent_pop_growth, y = total_passenger_growth, label = origin_city)) +
+  geom_point() +
+  geom_label_repel()
+```
+
+```{r}
+yrly_com_flights_by_city %>% 
+  arrange(desc(percent_pop_growth)) %>% 
+  head(20) %>% 
+  ggplot(mapping = aes(x = percent_pop_growth, y = passenger_growth_percentage, label = origin_city)) +
+  geom_point() +
+  geom_label_repel()
+
+yrly_com_flights_by_city %>% 
+  arrange(desc(passenger_growth_percentage)) %>% 
+  head(20) %>% 
+  ggplot(mapping = aes(x = percent_pop_growth, y = passenger_growth_percentage, label = origin_city)) +
+  geom_point() +
+  geom_label_repel()
+```
+
++ Remember, overall passenger volumes are down so Austin and Charlotte are outliers for growing
+
+```{r}
+yrly_com_flights_by_city %>% 
+  arrange(desc(percent_pop_growth)) %>% 
+  head(20) %>% 
+  ggplot(mapping = aes(x = total_load_factor, y = percent_pop_growth, label = origin_city)) +
+  geom_point() +
+  geom_label_repel()
+
+yrly_com_flights_by_city %>% 
+  arrange(desc(total_load_factor)) %>% 
+  head(20) %>% 
+  ggplot(mapping = aes(x = total_load_factor, y = percent_pop_growth, label = origin_city)) +
+  geom_point() +
+  geom_label_repel()
+```
+
+```{r}
+yrly_com_flights_by_city %>% 
+  arrange(desc(total_pop_growth)) %>% 
+  head(20) %>% 
+  ggplot(mapping = aes(x = total_load_factor, y = total_pop_growth, label = origin_city)) +
+  geom_point() +
+  geom_label_repel()
+```
+
+```{r}
+#load factor growths
+yrly_com_flights_by_city %>% 
+  arrange(desc(total_load_factor_growth)) %>% 
+  head(20) %>% 
+  ggplot(mapping = aes(x = total_load_factor_growth, y = total_pop_growth, label = origin_city)) +
+  geom_point() +
+  geom_label_repel()
+
+yrly_com_flights_by_city %>% 
+  arrange(desc(avg_load_factor_growth)) %>% 
+  head(20) %>% 
+  ggplot(mapping = aes(x = avg_load_factor_growth, y = total_pop_growth, label = origin_city)) +
+  geom_point() +
+  geom_label_repel()
+
+#load factor and passenger growths
+yrly_com_flights_by_city %>% 
+  arrange(desc(avg_load_factor_growth)) %>% 
+  head(20) %>% 
+  ggplot(mapping = aes(x = avg_load_factor_growth, y = total_passenger_growth, label = origin_city)) +
+  geom_point() +
+  geom_label_repel()
+```
+
+```{r}
+# all cities with positve passenger growth and positive load factor growth
+yrly_com_flights_by_city %>% 
+  filter(total_passenger_growth > 100000, avg_load_factor_growth > 0) %>% 
+  arrange(desc(total_passenger_growth)) %>% 
+  ggplot(mapping = aes(x = avg_load_factor_growth, y = total_passenger_growth, label = origin_city)) + 
+  geom_point() +
+  geom_label_repel()
+  
+```
+
+
+# Summary of findings
+
++ Charlotte, NC has largest load factor growth, as well as largest passenger growth (as percentage)
+    + Major positive outlier and must be candidate for further expansion
++ Dallas, TX has above average load factor and very large population growth
+    + Implies room to expoand there as well
++ Other cities with population growth, passenger growth, and high load factor:
+- Seattle, WA
+- Austin, TX
+- Phoenix, AZ
+
+
+# Plots
+
+## Start with general industry summary charts
+
+```{r}
+#save com flights df for using in other files
+write_csv(com_flights_df, path = 'com_flights_df.csv')
+
+pop_trend_data <- com_flights_df %>% 
+  group_by(year) %>% 
+  summarise(tot_passenger_vol = sum(passengers))
+
+pop_trend_plot <- ggplot(pop_trend_data, mapping = aes(x = year, y = tot_passenger_vol/1e6)) +
+  geom_line(color = 'grey') +
+  geom_line(filter(pop_trend_data, year > 2006), 
+            mapping = aes(x = year, y = tot_passenger_vol/1e6),
+            size = 1.5, 
+            color = '#750000')
+
+pop_trend_plot <- pop_trend_plot + 
+  geom_point(data = filter(pop_trend_data, year == 2009), 
+             mapping = aes(x = year, y = tot_passenger_vol/1e6), 
+             fill = '#344182', shape = 25, size = 3) +
+  geom_text(aes(x = 2010, y = tot_passenger_vol[year == 2009]/1e6 - 10), label = '526.3M', color = '#344182' )
+
+(pop_trend_data$tot_passenger_vol[20] - pop_trend_data$tot_passenger_vol[18]) / 
+  pop_trend_data$tot_passenger_vol[18] * 100
+
+pop_trend_plot + theme_classic() +
+  theme(axis.line.y = element_blank(),
+        axis.line.x = element_blank(),
+        axis.title.x  = element_blank(),
+        plot.title = element_text(color = "#808080",
+                                  size = 16, face = "bold"),
+        plot.subtitle = element_text(color = "#808080", 
+                                     size = 12, face = "plain"),
+        axis.text.x = element_text(color = "#808080", size = 11),
+        axis.text.y = element_text(color = "#808080", size = 11),
+        axis.title = element_text(color = "#808080", size = 11, face = "plain"),
+        legend.title = element_text(color = "#808080", size = 12, face = "plain"),
+        legend.text = element_text(color = "#808080", size = 12, face = "plain"),
+        plot.caption = element_text(color = "#808080", size = 10, face = "plain", margin = margin(t=10))
+        ) +
+  scale_x_continuous(breaks = seq(2005,2010, by = 2)) +
+  labs(title = 'Total passenger volume is falling',
+       subtitle = expression(paste('Down ',
+                                   italic(bold('9.1%')),
+                                   ' from 2007 peak')),
+       y = 'Millions of Passengers')
+```
+
+```{r}
+filled_trend_data <- com_flights_df %>% 
+  group_by(year) %>% 
+  summarise(avg_load_factor = mean(load_factor))
+
+filled_trend_plot <- ggplot(filled_trend_data, 
+                            mapping = aes(x = year,
+                                          y = avg_load_factor/100)) +
+  geom_line(color = 'grey') +
+  geom_line(filter(filled_trend_data, year > 2006), 
+            mapping = aes(x = year, y = avg_load_factor/100),
+            size = 1.5, 
+            color = '#344182')
+
+filled_trend_plot <- filled_trend_plot + 
+  geom_point(data = filter(filled_trend_data, year == 2009), 
+             mapping = aes(x = year, y = avg_load_factor/100), 
+             fill = '#344182', shape = 25, size = 3) +
+  geom_text(aes(x = 2010, y = avg_load_factor[year == 2009]/100 - 0.01), label = '71%', color = '#344182' )
+
+
+filled_trend_plot + theme_classic() +
+  theme(axis.line.y = element_blank(),
+        axis.line.x = element_blank(),
+        axis.title  = element_blank(),
+        plot.title = element_text(color = "#808080",
+                                  size = 16, face = "bold"),
+        plot.subtitle = element_text(color = "#808080", 
+                                     size = 12, face = "plain"),
+        axis.text.x = element_text(color = "#808080", size = 11),
+        axis.text.y = element_text(color = "#808080", size = 11),
+        legend.title = element_text(color = "#808080", size = 12, face = "plain"),
+        legend.text = element_text(color = "#808080", size = 12, face = "plain"),
+        plot.caption = element_text(color = "#808080", size = 10, face = "plain", margin = margin(t=10))
+        ) +
+  scale_x_continuous(breaks = seq(2005,2010, by = 2)) +
+  scale_y_continuous(labels = percent_format()) +
+  labs(title = 'However, percent of seats filled has gone up',
+       subtitle = 'Up 1 percentage point from 2007 total passenger peak')
+```
+
+## Recommendation Charts
+```{r}
+yrly_com_flights_by_city %>% 
+  ggplot(mapping = aes(x = total_pop_growth/1000000, y = total_passengers/1000000)) +
+  geom_point(color = 'grey') + 
+  geom_smooth(color = '#344182', method = 'lm', se = FALSE) +
+  theme_classic() +
+  theme(axis.line.y = element_blank(),
+        axis.line.x = element_blank(),
+        axis.title  = element_text(color = "#808080", size = 11, face = "bold"),
+        plot.title = element_text(color = "#808080",
+                                  size = 16, face = "bold"),
+        plot.subtitle = element_text(color = "#808080", 
+                                     size = 12, face = "plain"),
+        axis.text.x = element_text(color = "#808080", size = 11),
+        axis.text.y = element_text(color = "#808080", size = 11),
+        legend.title = element_text(color = "#808080", size = 12, face = "plain"),
+        legend.text = element_text(color = "#808080", size = 12, face = "plain"),
+        plot.caption = element_text(color = "#808080", size = 10, face = "plain", margin = margin(t=10))
+        ) +
+  xlab('Population growth') +
+  ylab('Total passengers') +
+  labs(title = 'Population growth correlates strongly with passenger growth',
+       subtitle = 'Numbers for previous five years (in millions)\nDallas, TX fastest growing city (by far)') +
+  geom_label_repel(filter(yrly_com_flights_by_city, origin_city == 'Dallas, TX'), 
+                   mapping = aes(x = total_pop_growth/1000000, y = total_passengers/1000000, label = origin_city),
+                   segment.color = '#344182', min.segment.length = 0, nudge_y = -15.5, label.size = NA, color = '#344182')
+```
+
+```{r}
+# all cities with positve passenger growth and positive load factor growth
+yrly_com_flights_by_city %>% 
+  filter(total_passenger_growth > 0, avg_load_factor_growth > 0) %>% 
+  arrange(desc(total_passenger_growth)) %>% 
+  ggplot(mapping = aes(x = avg_load_factor_growth/100, y = total_passenger_growth/1e6, label = origin_city)) + 
+  geom_point(color = 'grey') + 
+  theme_classic() +
+  theme(axis.line.y = element_blank(),
+        axis.line.x = element_blank(),
+        axis.title  = element_text(color = "#808080", size = 11, face = "bold"),
+        plot.title = element_text(color = "#808080",
+                                  size = 16, face = "bold"),
+        plot.subtitle = element_text(color = "#808080", 
+                                     size = 12, face = "plain"),
+        axis.text.x = element_text(color = "#808080", size = 11),
+        axis.text.y = element_text(color = "#808080", size = 11),
+        legend.title = element_text(color = "#808080", size = 12, face = "plain"),
+        legend.text = element_text(color = "#808080", size = 12, face = "plain"),
+        plot.caption = element_text(color = "#808080", size = 10, face = "plain", margin = margin(t=10))
+        ) +
+  scale_x_continuous(labels = percent_format()) +
+  xlab('Annualized load factor growth') +
+  ylab('Passenger growth (in millions)') +
+  labs(title = 'Charlotte is a major positive growth outlier',
+       subtitle = 'Both load factor growth and passenger growth are strong\n(only positve passenger growth cities shown) ') +
+  geom_label_repel(filter(yrly_com_flights_by_city, origin_city %in% c('Charlotte, NC', 'Seattle, WA', 'Miami, FL')), 
+                   mapping = aes(x = avg_load_factor_growth/100, y = total_passenger_growth/1e6, label = origin_city),
+                   segment.color = '#344182', min.segment.length = 0, nudge_y = -.15, label.size = NA, color = '#344182')
+
+```
+
+```{r}
+yrly_com_flights_by_city %>% 
+  filter(percent_pop_growth > 0) %>% 
+  filter(total_load_factor > 0.65) %>% 
+  ggplot(mapping = aes(x = total_load_factor, y = percent_pop_growth/100)) +
+  geom_point(color = 'grey') +
+  theme_classic() +
+  theme(axis.line.y = element_blank(),
+        axis.line.x = element_blank(),
+        axis.title  = element_text(color = "#808080", size = 11, face = "bold"),
+        plot.title = element_text(color = "#808080",
+                                  size = 16, face = "bold"),
+        plot.subtitle = element_text(color = "#808080", 
+                                     size = 12, face = "plain"),
+        axis.text.x = element_text(color = "#808080", size = 11),
+        axis.text.y = element_text(color = "#808080", size = 11),
+        legend.title = element_text(color = "#808080", size = 12, face = "plain"),
+        legend.text = element_text(color = "#808080", size = 12, face = "plain"),
+        plot.caption = element_text(color = "#808080", size = 10, face = "plain", margin = margin(t=10))
+        ) +
+  scale_x_continuous(labels = percent_format()) +
+  scale_y_continuous(labels = percent_format()) +
+  xlab('Load factor') +
+  ylab('Population growth') +
+  labs(title = 'Seattle and Miami are also prime candidates for expansion',
+       subtitle = 'High load factor, above average population growth') +
+  geom_label_repel(filter(yrly_com_flights_by_city, origin_city %in% c('Charlotte, NC', 'Seattle, WA', 'Dallas, TX', 'Miami, FL')), 
+                   mapping = aes(x = total_load_factor, y = percent_pop_growth/100, label = origin_city),
+                   segment.color = '#344182', min.segment.length = 0, nudge_y = 0.05, nudge_x = 0.05, label.size = NA, color = '#344182')
+```
+
 

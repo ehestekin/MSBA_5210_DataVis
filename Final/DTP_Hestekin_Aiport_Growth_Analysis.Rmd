@@ -814,6 +814,7 @@ yrly_com_flights_by_city %>%
                    mapping = aes(x = avg_load_factor_growth/100, y = total_passenger_growth/1e6, label = origin_city),
                    segment.color = '#344182', min.segment.length = 0, nudge_y = -.15, label.size = NA, color = '#344182')
 
+ggsave('charlotte_positive_growth_outlier.png', plot = last_plot())
 ```
 
 ```{r}
@@ -845,6 +846,8 @@ yrly_com_flights_by_city %>%
   geom_label_repel(filter(yrly_com_flights_by_city, origin_city %in% c('Charlotte, NC', 'Seattle, WA', 'Dallas, TX', 'Miami, FL')), 
                    mapping = aes(x = total_load_factor, y = percent_pop_growth/100, label = origin_city),
                    segment.color = '#344182', min.segment.length = 0, nudge_y = 0.05, nudge_x = 0.05, label.size = NA, color = '#344182')
+
+ggsave('seattle_miami_dallas_high_pop_growth_high_load_factor.png', plot = last_plot())
 ```
 
 
